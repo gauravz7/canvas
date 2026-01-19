@@ -1,0 +1,36 @@
+# Environment & Keys
+.env*
+*.key
+*.pem
+credentials.json
+service-account.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env/
+
+# Node / Frontend
+node_modules/
+dist/
+.DS_Store
+
+# Logs
+*.log
+server_log_*.txt
+
+# Media / Assets
+backend/media/
+backend/uploads/
+backend/outputs/
+data/
+storage/
+
+# System
+.idea/
+.vscode/
+.gemini/

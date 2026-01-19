@@ -1,0 +1,553 @@
+.canvas-page {
+  width: 100%;
+  height: 100%;
+  background-color: #111;
+  color: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.canvas-container {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+
+/* Modern Glassmorphism for Canvas Controls */
+/* React Flow Controls Override */
+.react-flow__controls {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.6) !important;
+  border-radius: 8px;
+  overflow: hidden;
+  z-index: 50 !important;
+  /* Ensure it's above other elements */
+}
+
+/* Specific override for the button groups inside controls */
+.react-flow__controls-button,
+.react-flow__controls button {
+  background: transparent !important;
+  background-color: transparent !important;
+  /* Double tap */
+  border: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  border-radius: 0 !important;
+  transition: all 0.2s;
+  width: 30px !important;
+  height: 30px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.react-flow__controls-button:hover,
+.react-flow__controls button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
+}
+
+.react-flow__controls-button svg,
+.react-flow__controls button svg {
+  fill: currentColor !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+}
+
+/* Telemetry / Navigation Controls if any */
+.telemetry-btn,
+.bottom-right-btn {
+  background: rgba(0, 0, 0, 0.4) !important;
+  color: white !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+.telemetry-btn:hover,
+.bottom-right-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.canvas-controls {
+  background: rgba(20, 20, 20, 0.6) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  fill: rgba(255, 255, 255, 0.8) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+}
+
+.canvas-controls button {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  transition: all 0.2s ease;
+}
+
+.canvas-controls button:last-child {
+  border-bottom: none !important;
+}
+
+.canvas-controls button:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
+}
+
+/* Toolbar Styles */
+.canvas-toolbar {
+  position: absolute;
+  top: 1.5rem;
+  left: 1.5rem;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.toolbar-panel {
+  background: rgba(30, 30, 35, 0.8);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 1rem;
+  padding: 0.75rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.toolbar-header {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.25rem;
+  padding-left: 0.25rem;
+}
+
+.node-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  cursor: grab;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.node-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.node-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: inherit;
+}
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  width: 100%;
+  text-align: left;
+}
+
+.toolbar-btn.run {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.6), rgba(5, 150, 105, 0.6));
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: white;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.toolbar-btn.run:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.8), rgba(5, 150, 105, 0.8));
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
+}
+
+.toolbar-btn.secondary {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.toolbar-btn.secondary:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+
+/* Branching Styles */
+.node-category {
+  margin-bottom: 0.25rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  background-color: transparent;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: default;
+  transition: color 0.2s;
+}
+
+.node-category:hover .category-header {
+  color: white;
+}
+
+.category-items {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding-left: 0.5rem;
+  position: relative;
+}
+
+.category-items::before {
+  content: '';
+  position: absolute;
+  left: 1.1rem;
+  top: 0;
+  bottom: 0.5rem;
+  width: 1px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.1), transparent);
+}
+
+.node-category:hover .category-items {
+  max-height: 500px;
+  opacity: 1;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+.node-item.sub {
+  position: relative;
+  margin-left: 0.75rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.node-item.sub::before {
+  content: '';
+  position: absolute;
+  left: -0.25rem;
+  top: 50%;
+  width: 0.5rem;
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.node-item.sub:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: white;
+  border-radius: 0.5rem;
+}
+
+.toolbar-panel-section-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.1), transparent);
+  margin: 0.5rem 0;
+}
+
+/* Node Components */
+.node-card {
+  background: rgba(30, 30, 35, 0.6);
+  backdrop-filter: blur(12px);
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  height: 100%;
+  min-width: 250px;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  color: white;
+  transition: all 0.3s ease;
+}
+
+.node-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.4);
+}
+
+.node-header {
+  height: 2.75rem;
+  padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
+  border-top-left-radius: 1rem;
+  border-top-right-radius: 1rem;
+}
+
+.node-header.purple {
+  background-color: rgba(139, 92, 246, 0.15);
+}
+
+.node-header.blue {
+  background-color: rgba(59, 130, 246, 0.15);
+}
+
+.node-header.green {
+  background-color: rgba(16, 185, 129, 0.15);
+}
+
+.node-header.orange {
+  background-color: rgba(249, 115, 22, 0.15);
+}
+
+.node-title-text {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.01em;
+}
+
+
+.node-content {
+  padding: 0.75rem;
+  /* p-3 */
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  /* space-y-3 equivalent */
+}
+
+.node-text-small {
+  font-size: 0.75rem;
+  /* xs */
+  color: #9ca3af;
+  /* gray-400 */
+}
+
+.node-value-box {
+  font-size: 0.75rem;
+  /* xs */
+  background-color: #111827;
+  /* gray-900 */
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  color: #d1d5db;
+  /* gray-300 */
+  max-height: 5rem;
+  /* max-h-20 */
+  overflow-y: auto;
+}
+
+.node-input-wrapper {
+  position: relative;
+  margin-top: auto;
+  min-height: 1rem;
+}
+
+.node-output-wrapper {
+  position: relative;
+  margin-bottom: 0.75rem;
+  min-height: 1rem;
+}
+
+.node-handle {
+  width: 0.75rem;
+  /* w-3 */
+  height: 0.75rem;
+  /* h-3 */
+  border: 2px solid #1e1e1e;
+  border-radius: 50%;
+}
+
+.node-handle.input {
+  background-color: #3b82f6;
+  /* blue-500 */
+}
+
+.node-handle.output {
+  background-color: #22c55e;
+  /* green-500 */
+}
+
+.node-handle-label {
+  position: absolute;
+  font-size: 10px;
+  color: #6b7280;
+  /* gray-500 */
+  top: -0.5rem;
+}
+
+.node-handle-label.left {
+  left: 1rem;
+}
+
+.node-handle-label.right {
+  right: 1rem;
+}
+
+/* Input Specifics */
+.node-input-field {
+  width: 90%;
+  background-color: #111827;
+  /* gray-900 */
+  border: 1px solid #374151;
+  /* gray-700 */
+  border-radius: 0.25rem;
+  padding: 0.5rem;
+  color: white;
+  font-size: 0.75rem;
+  /* xs */
+}
+
+.node-file-preview {
+  margin-top: 0.5rem;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  border-radius: 0.25rem;
+  flex: 1;
+  /* Allow it to grow in flex containers */
+  min-height: 0;
+}
+
+/* Override default React Flow selection border */
+.react-flow__node.selected .node-card {
+  border: 1px solid #3b82f6 !important;
+  /* Blue border instead of default */
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+.react-flow__node:focus {
+  outline: none !important;
+}
+
+.react-flow__node {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+/* Delete Button */
+.delete-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: #6b7280;
+  /* gray-500 */
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.delete-btn:hover {
+  background-color: rgba(239, 68, 68, 0.2);
+  /* red-500/20 */
+  color: #ef4444;
+  /* red-500 */
+}
+
+/* Running state animation */
+@keyframes pulse-border {
+  0% {
+    border-color: #333;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  }
+
+  50% {
+    border-color: #3b82f6;
+    box-shadow: 0 0 8px 1px rgba(59, 130, 246, 0.5);
+  }
+
+  100% {
+    border-color: #333;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  }
+}
+
+.node-card.running {
+  animation: pulse-border 1.5s infinite;
+  border-color: #3b82f6;
+  position: relative;
+}
+
+.status-badge {
+  position: absolute;
+  top: -22px;
+  right: 0;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(4px);
+}
+
+.status-badge.running {
+  background-color: rgba(59, 130, 246, 0.9);
+  color: white;
+  border: 1px solid rgba(147, 197, 253, 0.5);
+}
+
+.status-badge.completed {
+  background-color: rgba(34, 197, 94, 0.95);
+  color: white;
+  border: 1px solid rgba(134, 239, 172, 0.5);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.4);
+}
+
+.status-badge.completed::before {
+  content: "✓ ";
+  font-weight: 800;
+  margin-right: 2px;
+}
+
+.status-badge.failed {
+  background-color: rgba(239, 68, 68, 0.95);
+  color: white;
+  border: 1px solid rgba(252, 165, 165, 0.5);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+.status-badge.failed::before {
+  content: "✕ ";
+  font-weight: 800;
+  margin-right: 2px;
+}

@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+google-genai
+google-auth
+google-cloud-texttospeech
+pydantic
+python-multipart
+sqlalchemy
+sse-starlette
+google-cloud-storage
+httpx
