@@ -59,10 +59,19 @@ const HistoryPanel = ({ userId }) => {
     if (asset.asset_type === 'image') {
       return <img src={src} alt={asset.prompt} loading="lazy" />;
     } else if (asset.asset_type === 'video') {
-      return <video src={src} controls className="history-video" />;
+      return (
+        <video
+          src={src}
+          className="history-video"
+          muted
+          onMouseOver={e => e.target.play()}
+          onMouseOut={e => { e.target.pause(); e.target.currentTime = 0; }}
+          loop
+        />
+      );
     } else if (asset.asset_type === 'audio') {
       return (
-        <div style={{ padding: '1rem', width: '100%' }}>
+        <div style={{ padding: '0.75rem', width: '100%' }}>
           <WaveformPlayer src={src} mimeType={asset.mime_type} />
         </div>
       );
@@ -72,8 +81,8 @@ const HistoryPanel = ({ userId }) => {
   };
 
   return (
-    <div className="glass-panel">
-      <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
+    <div className="studio-container">
+      <div className="studio-header">
         <div>
           <h2 style={{ margin: 0 }}>Studio History</h2>
           <p style={{ marginTop: '0.5rem', opacity: 0.7 }}>Browse and manage your creative workspace assets</p>
@@ -87,85 +96,90 @@ const HistoryPanel = ({ userId }) => {
         </button>
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-        gap: '2rem'
-      }}>
-        {assets.map((asset) => {
-          const src = getAssetSrc(asset);
-          return (
-            <div key={asset.id} className="asset-card">
-              <div className="asset-preview" style={{
-                aspectRatio: asset.asset_type === 'audio' ? 'auto' : '16/9',
-                padding: asset.asset_type === 'audio' ? '0' : undefined
-              }}>
-                {renderAssetPreview(asset)}
-                <div className="asset-badge">
-                  {getIcon(asset.asset_type)} {asset.asset_type}
-                </div>
-              </div>
-
-              <div className="asset-info">
-                <div className="asset-timestamp">
-                  {new Date(asset.created_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-                </div>
-
-                {asset.prompt && (
-                  <p className="asset-prompt" title={asset.prompt}>
-                    {asset.prompt}
-                  </p>
-                )}
-
-                <div className="asset-footer">
-                  <span style={{ fontSize: '0.7rem', color: 'var(--accent-secondary)', fontWeight: '600', letterSpacing: '0.02em', opacity: 0.8 }}>
-                    {asset.model_id || 'System Generated'}
-                  </span>
-
-                  {src && (
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <a
-                        href={src}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-secondary"
-                        style={{ padding: '0.4rem', borderRadius: '0.5rem' }}
-                        title="Open in new tab"
-                      >
-                        <ExternalLink size={14} />
-                      </a>
-                      <a
-                        href={src}
-                        download={`asset-${asset.id}.${asset.asset_type === 'image' ? 'png' : 'wav'}`}
-                        className="btn-secondary"
-                        style={{ padding: '0.4rem', borderRadius: '0.5rem' }}
-                        title="Download"
-                      >
-                        <Download size={14} />
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-
-        {assets.length === 0 && !loading && (
+      <div className="studio-content-area">
+        <div className="studio-scroll-container">
           <div style={{
-            gridColumn: '1/-1',
-            textAlign: 'center',
-            padding: '4rem 2rem',
-            background: 'rgba(255,255,255,0.02)',
-            borderRadius: '1.5rem',
-            border: '1px dashed var(--glass-border)',
-            color: 'var(--text-secondary)'
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gap: '1.25rem',
+            paddingRight: '0.5rem'
           }}>
-            <ImageIcon size={48} style={{ opacity: 0.1, marginBottom: '1rem' }} />
-            <p>Your creative library is empty</p>
-            <p style={{ fontSize: '0.8rem', opacity: 0.6 }}>Generated assets will automatically appear here</p>
+            {assets.map((asset) => {
+              const src = getAssetSrc(asset);
+              return (
+                <div key={asset.id} className="asset-card">
+                  <div className="asset-preview" style={{
+                    aspectRatio: asset.asset_type === 'audio' ? 'auto' : '16/9',
+                    padding: asset.asset_type === 'audio' ? '0' : undefined
+                  }}>
+                    {renderAssetPreview(asset)}
+                    <div className="asset-badge">
+                      {getIcon(asset.asset_type)} {asset.asset_type}
+                    </div>
+                  </div>
+
+                  <div className="asset-info" style={{ padding: '0.75rem' }}>
+                    <div className="asset-timestamp">
+                      {new Date(asset.created_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                    </div>
+
+                    {asset.prompt && (
+                      <p className="asset-prompt" title={asset.prompt} style={{ fontSize: '0.75rem', marginBottom: '0.5rem' }}>
+                        {asset.prompt}
+                      </p>
+                    )}
+
+                    <div className="asset-footer" style={{ marginTop: '0.5rem', paddingTop: '0.5rem' }}>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--accent-secondary)', fontWeight: '600', letterSpacing: '0.02em', opacity: 0.8 }}>
+                        {asset.model_id || 'System Generated'}
+                      </span>
+
+                      {src && (
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <a
+                            href={src}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-secondary"
+                            style={{ padding: '0.3rem', borderRadius: '0.4rem' }}
+                            title="Open in new tab"
+                          >
+                            <ExternalLink size={12} />
+                          </a>
+                          <a
+                            href={src}
+                            download={`asset-${asset.id}.${asset.asset_type === 'image' ? 'png' : 'wav'}`}
+                            className="btn-secondary"
+                            style={{ padding: '0.3rem', borderRadius: '0.4rem' }}
+                            title="Download"
+                          >
+                            <Download size={12} />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {assets.length === 0 && !loading && (
+              <div style={{
+                gridColumn: '1/-1',
+                textAlign: 'center',
+                padding: '4rem 2rem',
+                background: 'rgba(255,255,255,0.02)',
+                borderRadius: '1.5rem',
+                border: '1px dashed var(--glass-border)',
+                color: 'var(--text-secondary)'
+              }}>
+                <ImageIcon size={48} style={{ opacity: 0.1, marginBottom: '1rem' }} />
+                <p>Your creative library is empty</p>
+                <p style={{ fontSize: '0.8rem', opacity: 0.6 }}>Generated assets will automatically appear here</p>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 .env*
 *.key
 *.pem
+keys.json
 credentials.json
 service-account.json
 
