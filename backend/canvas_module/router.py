@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Body
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Workflow as WorkflowModel
@@ -107,7 +107,14 @@ async def list_workflows(user_id: str = "default_user", db: Session = Depends(ge
             ) for wf in workflows
         ]
     )
-
+@router.get("/{workflow_id}", response_model=Dict[str, Any])
+async def get_workflow(workflow_id: str, db: Session = Depends(get_db)):
+    """
+    Get a specific workflow by ID.
+    """
+    db_workflow = db.query(WorkflowModel).filter(WorkflowModel.id == workflow_id).first()
+    if not db_workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
     return db_workflow.data
 
 

@@ -137,7 +137,7 @@ function App() {
             )}
 
             {activeTab === 'studio' && (
-              <div className="absolute inset-0 z-10">
+              <div className="absolute inset-0 z-10 overflow-y-auto custom-scrollbar">
                 <StudioPanel userId={userId} />
               </div>
             )}

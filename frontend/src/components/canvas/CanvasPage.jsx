@@ -58,6 +58,8 @@ const CanvasPage = () => {
   const [useCache, setUseCache] = useState(false);
   const [currentExecutionId, setCurrentExecutionId] = useState(null);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
+  const [workflowId, setWorkflowId] = useState(uuidv4());
+  const [workflowName, setWorkflowName] = useState('Untitled Workflow');
   const reactFlowWrapper = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -78,6 +80,8 @@ const CanvasPage = () => {
         if (flow.nodes && flow.edges) {
           setNodes(flow.nodes);
           setEdges(flow.edges);
+          if (flow.id) setWorkflowId(flow.id);
+          if (flow.name) setWorkflowName(flow.name);
           // Auto-trigger fitView after a short delay
           setTimeout(() => {
             if (reactFlowInstance) reactFlowInstance.fitView();
@@ -466,10 +470,15 @@ const CanvasPage = () => {
   const handleSave = async () => {
     try {
       const flow = reactFlowInstance.toObject();
+      const payload = {
+        ...flow,
+        id: workflowId,
+        name: workflowName
+      };
       const response = await fetch('/api/workflow/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(flow)
+        body: JSON.stringify(payload)
       });
       if (response.ok) {
         alert('Workflow saved!');
@@ -603,6 +612,8 @@ const CanvasPage = () => {
           isRunning={isRunning}
           useCache={useCache}
           setUseCache={setUseCache}
+          workflowName={workflowName}
+          setWorkflowName={setWorkflowName}
         />
       </div>
 

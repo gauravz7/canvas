@@ -1,7 +1,7 @@
 import React from 'react';
 import { Bot, Image as ImageIcon, FileInput, Eye, Play, Save, Upload, Download, ArrowUpCircle, Volume2, Video, Workflow, Trash, Film } from 'lucide-react';
 
-const Toolbar = ({ onDragStart, onAddNode, onRun, onKill, onSave, onImport, onExport, isRunning, useCache, setUseCache }) => {
+const Toolbar = ({ onDragStart, onAddNode, onRun, onKill, onSave, onImport, onExport, isRunning, useCache, setUseCache, workflowName, setWorkflowName }) => {
   React.useEffect(() => {
     console.log("Toolbar mounted");
   }, []);
@@ -149,6 +149,21 @@ const Toolbar = ({ onDragStart, onAddNode, onRun, onKill, onSave, onImport, onEx
 
       {/* Actions */}
       <div className="toolbar-panel">
+        <div className="toolbar-header">Project</div>
+
+        <div className="px-2 mb-4">
+          <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1.5 ml-1">
+            Canvas Name
+          </label>
+          <input
+            type="text"
+            value={workflowName}
+            onChange={(e) => setWorkflowName(e.target.value)}
+            className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+            placeholder="Enter workflow name..."
+          />
+        </div>
+
         <div className="toolbar-header">Actions</div>
 
         {isRunning ? (

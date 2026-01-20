@@ -118,8 +118,26 @@ class VertexService:
             if "predictions" not in data or not data["predictions"]:
                 raise Exception(f"No predictions in response: {data}")
             
-            # The API returns bytesBase64Encoded in the first prediction
-            return data["predictions"][0]["bytesBase64Encoded"]
+            # The API response structure can vary. We'll try to extract the upscaled image robustly.
+            prediction = data["predictions"][0]
+            
+            # 1. Try direct bytesBase64Encoded
+            if isinstance(prediction, dict) and "bytesBase64Encoded" in prediction:
+                return prediction["bytesBase64Encoded"]
+            
+            # 2. Try nested in an "image" key
+            if isinstance(prediction, dict) and "image" in prediction and isinstance(prediction["image"], dict):
+                if "bytesBase64Encoded" in prediction["image"]:
+                    return prediction["image"]["bytesBase64Encoded"]
+            
+            # 3. If prediction is already a string, assume it's the base64 data
+            if isinstance(prediction, str):
+                return prediction
+                
+            # If all fails, log the response and raise a descriptive error
+            import json
+            print(f"[ERROR] Failed to extract upscaled image. Prediction structure: {json.dumps(prediction, indent=2)}")
+            raise Exception("Failed to extract upscaled image from Vertex AI response. Check logs for details.")
 
     async def generate_music(self, prompt: str, negative_prompt: str = "", seed: int = 12345) -> Dict[str, Any]:
         """Generates music using Lyria-002 model on Vertex AI."""

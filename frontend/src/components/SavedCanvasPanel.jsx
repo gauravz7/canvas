@@ -212,23 +212,21 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
           </button>
           
           <button
-             onClick={() => {
-                // We'll need a way to pass the workflow to CanvasPage
-                // For now, let's use localStorage as a bridge
-                localStorage.setItem('pending_workflow_load', JSON.stringify({
-                    ...selectedWorkflow,
-                    nodes: selectedWorkflow.nodes.map(node => {
-                        if (node.type === 'input' && inputs[node.id] !== undefined) {
-                            return { ...node, data: { ...node.data, value: inputs[node.id] } };
-                        }
-                        return node;
-                    })
-                }));
-                onSwitchToCanvas();
-             }}
-             className="px-6 py-4 rounded-xl bg-white-5 hover:bg-white-10 text-white font-semibold border border-white-10 transition-all"
+            onClick={() => {
+              localStorage.setItem('pending_workflow_load', JSON.stringify({
+                ...selectedWorkflow,
+                nodes: selectedWorkflow.nodes.map(node => {
+                  if (node.type === 'input' && inputs[node.id] !== undefined) {
+                    return { ...node, data: { ...node.data, value: inputs[node.id] } };
+                  }
+                  return node;
+                })
+              }));
+              onSwitchToCanvas();
+            }}
+            className="px-6 py-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold border border-blue-500/20 shadow-lg shadow-blue-900/30 transition-all active:scale-95"
           >
-            Open in Canvas
+            Open in Canvas to Edit
           </button>
         </div>
       </div>
@@ -341,16 +339,38 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
               <h2 className="text-[10px] font-bold text-white-40 uppercase tracking-[0.2em] mb-4 px-2">Your Saved</h2>
               <div className="space-y-1">
                 {savedWorkflows.map(wf => (
-                  <button
-                    key={wf.id}
-                    onClick={() => handleSelectWorkflow(wf)}
-                    className={`w-full text-left p-3 rounded-xl transition-all group flex items-center justify-between ${
-                      selectedWorkflow?.id === wf.id ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/20' : 'text-white-60 hover:bg-white-5 hover:text-white'
-                    }`}
-                  >
-                    <span className="text-sm font-medium truncate">{wf.name}</span>
-                    <ChevronRight size={14} className={`transition-transform duration-300 ${selectedWorkflow?.id === wf.id ? 'translate-x-1' : 'opacity-0'}`} />
-                  </button>
+                  <div key={wf.id} className="group flex items-center gap-1">
+                    <button
+                      onClick={() => handleSelectWorkflow(wf)}
+                      className={`flex-1 text-left p-3 rounded-l-xl transition-all group flex items-center justify-between ${selectedWorkflow?.id === wf.id ? 'bg-indigo-600/20 text-indigo-400 border-y border-l border-indigo-500/20' : 'text-white-60 hover:bg-white-5 hover:text-white'
+                        }`}
+                    >
+                      <span className="text-sm font-medium truncate">{wf.name}</span>
+                      <ChevronRight size={14} className={`transition-transform duration-300 ${selectedWorkflow?.id === wf.id ? 'translate-x-1' : 'opacity-0'}`} />
+                    </button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        setLoading(true);
+                        try {
+                          const res = await fetch(`/api/workflow/${wf.id}`);
+                          if (res.ok) {
+                            const data = await res.json();
+                            localStorage.setItem('pending_workflow_load', JSON.stringify(data));
+                            onSwitchToCanvas();
+                          }
+                        } catch (err) {
+                          console.error("Failed to load workflow for editing", err);
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      className="p-3 rounded-r-xl bg-white-5 hover:bg-white-10 text-white-40 hover:text-white transition-all border-y border-r border-white-10"
+                      title="Edit original workflow"
+                    >
+                      <Settings2 size={14} />
+                    </button>
+                  </div>
                 ))}
                 {savedWorkflows.length === 0 && !loading && (
                     <div className="p-4 text-center border border-dashed border-white-10 rounded-xl">
