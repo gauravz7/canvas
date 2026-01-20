@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import StudioPanel from './components/StudioPanel';
 import HistoryPanel from './components/HistoryPanel';
 import LogPanel from './components/LogPanel';
+import SavedCanvasPanel from './components/SavedCanvasPanel';
 import CanvasPage from './components/canvas/CanvasPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import {
@@ -10,6 +11,7 @@ import {
   LayoutGrid, // Modern icon for Canvas
   AppWindow, // Modern icon for Studio
   Infinity, // Icon for Branding
+  Library, // Icon for Saved Canvas
 } from 'lucide-react';
 
 import { ConfigProvider } from './contexts/ConfigContext';
@@ -26,6 +28,7 @@ function App() {
 
   const navItems = [
     { id: 'canvas', label: 'Canvas', icon: <LayoutGrid size={20} /> },
+    { id: 'templates', label: 'Saved Canvas', icon: <Library size={20} /> },
     { id: 'studio', label: 'Studio', icon: <AppWindow size={20} /> },
     { id: 'history', label: 'History', icon: <History size={20} /> },
   ];
@@ -41,13 +44,22 @@ function App() {
               <h1 className="text-2xl font-bold flex items-center gap-2 tracking-tighter">
                 <span className="text-gradient-brand flex items-center gap-2">
                   <div className="infinity-container">
-                    <Infinity size={28} strokeWidth={2.5} className="infinity-main" />
-                    {/* SVG tracer that follows the path */}
-                    <svg width="28" height="28" viewBox="0 0 24 24" className="infinity-tracer-svg">
+                    <Infinity size={32} strokeWidth={2.5} className="infinity-main" />
+                    {/* SVG tracer that follows the path perfectly */}
+                    <svg width="32" height="32" viewBox="0 0 24 24" className="infinity-tracer-svg">
+                      <defs>
+                        <linearGradient id="silver-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="rgba(255,255,255,0)" />
+                          <stop offset="50%" stopColor="rgba(255,255,255,0.8)" />
+                          <stop offset="100%" stopColor="rgba(255,255,255,1)" />
+                        </linearGradient>
+                      </defs>
                       <path
-                        d="M18.18 17.77C15.81 19.32 12.18 19.32 9.81 17.77L5.82 15.11C3.45 13.56 3.45 9.92 5.82 8.37C8.19 6.82 11.82 6.82 14.19 8.37L18.18 11.03C20.55 12.58 20.55 16.22 18.18 17.77Z"
+                        d="M6 16c5 0 7-8 12-8a4 4 0 0 1 0 8c-5 0-7-8-12-8a4 4 0 1 0 0 8"
                         className="infinity-tracer-path"
+                        stroke="url(#silver-gradient)"
                         strokeLinecap="round"
+                        pathLength="1"
                       />
                     </svg>
                   </div>
@@ -104,6 +116,15 @@ function App() {
                   <RefreshCw size={14} />
                 </button>
               </div>
+              <div className="mt-4 pt-4 border-t border-white/5">
+                <a
+                  href="mailto:gauravz@google.com"
+                  className="text-[8px] text-white-40 hover:text-white-60 transition-colors flex items-center gap-4 no-underline"
+                >
+                  <span className="opacity-50">Created by:</span>
+                  <span className="font-semibold text-white-50">gauravz</span>
+                </a>
+              </div>
             </div>
           </aside>
 
@@ -118,6 +139,12 @@ function App() {
             {activeTab === 'studio' && (
               <div className="absolute inset-0 z-10">
                 <StudioPanel userId={userId} />
+              </div>
+            )}
+
+            {activeTab === 'templates' && (
+              <div className="absolute inset-0 z-10 p-8 overflow-y-auto custom-scrollbar">
+                <SavedCanvasPanel userId={userId} onSwitchToCanvas={() => setActiveTab('canvas')} />
               </div>
             )}
 

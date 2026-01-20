@@ -7,6 +7,7 @@ from .schemas import Workflow, ExecutionRequest, WorkflowExecutionResponse, Node
 from .engine import WorkflowEngine
 import json
 import uuid
+from .example_workflows import EXAMPLE_WORKFLOWS
 
 from fastapi.responses import StreamingResponse
 from datetime import datetime
@@ -26,9 +27,23 @@ engine = WorkflowEngine()
 @router.post("/execute/stream")
 async def stream_execute_workflow(request: ExecutionRequest, db: Session = Depends(get_db)):
     return StreamingResponse(
-        engine.stream_workflow_execution(request.workflow, request.node_ids, db=db, use_cache=request.use_cache),
+        engine.stream_workflow_execution(
+            request.workflow, 
+            request.node_ids, 
+            db=db, 
+            use_cache=request.use_cache,
+            execution_id=request.execution_id
+        ),
         media_type="text/event-stream"
     )
+
+@router.post("/execute/cancel/{execution_id}")
+async def cancel_workflow(execution_id: str):
+    success = engine.cancel_execution(execution_id)
+    if success:
+        return {"status": "success", "message": f"Execution {execution_id} cancelled"}
+    else:
+        raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found or already finished")
 
 @router.post("/execute", response_model=WorkflowExecutionResponse)
 async def execute_workflow(request: ExecutionRequest, db: Session = Depends(get_db)):
@@ -93,12 +108,15 @@ async def list_workflows(user_id: str = "default_user", db: Session = Depends(ge
         ]
     )
 
-@router.get("/{workflow_id}")
-async def get_workflow(workflow_id: str, db: Session = Depends(get_db)):
-    db_workflow = db.query(WorkflowModel).filter(WorkflowModel.id == workflow_id).first()
-    if not db_workflow:
-        raise HTTPException(status_code=404, detail="Workflow not found")
     return db_workflow.data
+
+
+@router.get("/templates/examples")
+async def get_example_workflows():
+    """
+    Returns the predefined example workflows.
+    """
+    return {"workflows": EXAMPLE_WORKFLOWS}
 
 
 @router.post("/import")

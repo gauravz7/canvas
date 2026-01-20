@@ -68,7 +68,8 @@ class Workflow(BaseModel):
 class ExecutionRequest(BaseModel):
     workflow: Workflow
     node_ids: Optional[List[str]] = None
-    use_cache: bool = False # Default to False as per user request 
+    use_cache: bool = False
+    execution_id: Optional[str] = None
     # Current design: User likely wants to "Run Node" which implies running that node given current context, 
     # or "Run Workflow" which runs everything.
     # For now, if node_ids is present, we might assume the frontend ensures inputs are ready or we re-run deps.

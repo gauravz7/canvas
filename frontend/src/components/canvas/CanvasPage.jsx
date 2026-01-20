@@ -56,6 +56,7 @@ const CanvasPage = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [useCache, setUseCache] = useState(false);
+  const [currentExecutionId, setCurrentExecutionId] = useState(null);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const reactFlowWrapper = useRef(null);
   const fileInputRef = useRef(null);
@@ -68,8 +69,28 @@ const CanvasPage = () => {
   edgesRef.current = edges;
   nodesRef.current = nodes;
 
-  // Load Sample Workflow on Mount if empty
+  // Load Sample Workflow on Mount if empty or check for pending load
   React.useEffect(() => {
+    const pendingLoad = localStorage.getItem('pending_workflow_load');
+    if (pendingLoad) {
+      try {
+        const flow = JSON.parse(pendingLoad);
+        if (flow.nodes && flow.edges) {
+          setNodes(flow.nodes);
+          setEdges(flow.edges);
+          // Auto-trigger fitView after a short delay
+          setTimeout(() => {
+            if (reactFlowInstance) reactFlowInstance.fitView();
+          }, 100);
+        }
+        localStorage.removeItem('pending_workflow_load');
+        return; // Don't load sample if we loaded a pending one
+      } catch (e) {
+        console.error("Failed to load pending workflow", e);
+        localStorage.removeItem('pending_workflow_load');
+      }
+    }
+
     if (nodes.length === 0) {
       // Sample Workflow
       const sampleNodes = [
@@ -84,7 +105,7 @@ const CanvasPage = () => {
       setNodes(sampleNodes);
       setEdges(sampleEdges);
     }
-  }, []);
+  }, [reactFlowInstance]);
 
   const controlStyles = `
   #canvas-controls-wrapper .react-flow__controls {
@@ -311,6 +332,8 @@ const CanvasPage = () => {
     const currentEdges = edgesRef.current;
 
     setIsRunning(true);
+    const executionId = uuidv4();
+    setCurrentExecutionId(executionId);
 
     // Reset status and results for nodes being run
     setNodes((nds) =>
@@ -353,7 +376,8 @@ const CanvasPage = () => {
             }))
           },
           node_ids: runNodeIds,
-          use_cache: useCache
+          use_cache: useCache,
+          execution_id: executionId
         }),
       });
 
@@ -407,8 +431,9 @@ const CanvasPage = () => {
                 )
               );
               if (isCache) console.log(`Node ${data.node_id} used cache`);
-            } else if (data.type === 'workflow_completed') {
+            } else if (data.type === 'workflow_completed' || data.type === 'execution_cancelled') {
               setIsRunning(false);
+              setCurrentExecutionId(null);
             }
           } catch (e) {
             console.error("Failed to parse SSE event:", trimmedLine, e);
@@ -418,7 +443,23 @@ const CanvasPage = () => {
     } catch (error) {
       console.error('Execution Error:', error);
       setIsRunning(false);
+      setCurrentExecutionId(null);
       alert('Execution error: ' + error.message);
+    }
+  };
+
+  const handleKill = async () => {
+    if (!currentExecutionId) return;
+    try {
+      const response = await fetch(`/api/workflow/execute/cancel/${currentExecutionId}`, {
+        method: 'POST'
+      });
+      if (!response.ok) {
+        throw new Error('Kill request failed');
+      }
+      console.log('Kill signal sent for:', currentExecutionId);
+    } catch (error) {
+      console.error('Kill Error:', error);
     }
   };
 
@@ -555,6 +596,7 @@ const CanvasPage = () => {
           onDragStart={onDragStart}
           onAddNode={handleAddNode}
           onRun={handleRun}
+          onKill={handleKill}
           onSave={handleSave}
           onImport={handleImport}
           onExport={handleExport}

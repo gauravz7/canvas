@@ -52,6 +52,7 @@ class WorkflowEngine:
         self.executors = {
             'editor': EditorExecutor(self.services)
         }
+        self.active_tasks: Dict[str, asyncio.Task] = {}
 
     def _compute_cache_key(self, node: Node, inputs: Dict[str, Any]) -> str:
         """Computes a stable hash for cache key based on node config and resolved inputs."""
@@ -187,51 +188,65 @@ class WorkflowEngine:
         
         return {"data": bytes_data, "mime_type": mime_type}
 
-    async def stream_workflow_execution(self, workflow: Workflow, node_ids: List[str] = None, user_id: str = "default", db: Session = None, use_cache: bool = False):
+    async def stream_workflow_execution(self, workflow: Workflow, node_ids: List[str] = None, user_id: str = "default", db: Session = None, use_cache: bool = False, execution_id: str = None):
         """
         Streams execution events for the workflow.
         Yields JSON strings formatted as SSE data.
         """
-        context: Dict[str, Any] = {}
-        
-        # 1. Build Dependency Graph
-        deps: Dict[str, List[str]] = {node.id: [] for node in workflow.nodes}
-        for edge in workflow.edges:
-            if edge.target in deps:
-                deps[edge.target].append(edge.source)
-        
-        # 2. Determine Nodes to Execute
-        if node_ids:
-            node_map = {node.id: node for node in workflow.nodes}
-            nodes_to_run = [node_map[nid] for nid in node_ids if nid in node_map]
-        else:
-            nodes_to_run = self._topological_sort(workflow.nodes, deps)
+        if execution_id:
+            # Register current task
+            self.active_tasks[execution_id] = asyncio.current_task()
+            logger.info(f"[KILL] Task registered: {execution_id}")
 
-        # 3. Execute Nodes
-        for node in nodes_to_run:
-            try:
-                # Signal node start
-                yield f"data: {json.dumps({'type': 'node_started', 'node_id': node.id})}\n\n"
-                
-                # Resolve Inputs
-                inputs = self._resolve_inputs(node, workflow.edges, context)
-                
-                # Execute Node Logic
-                output = await self._execute_node(node, inputs, user_id, db, context=context, use_cache=use_cache)
-                
-                # Store Output
-                context[node.id] = output
-                
-                # Signal node completion
-                res = ExecutionResult(node_id=node.id, status="completed", output=output)
-                yield f"data: {json.dumps({'type': 'node_completed', 'node_id': node.id, 'result': res.model_dump()})}\n\n"
-                
-            except Exception as e:
-                logger.error(f"Error executing node {node.id}: {e}")
-                res = ExecutionResult(node_id=node.id, status="failed", output=None, error=str(e))
-                yield f"data: {json.dumps({'type': 'node_failed', 'node_id': node.id, 'result': res.model_dump()})}\n\n"
-        
-        yield f"data: {json.dumps({'type': 'workflow_completed'})}\n\n"
+        try:
+            context: Dict[str, Any] = {}
+            
+            # 1. Build Dependency Graph
+            deps: Dict[str, List[str]] = {node.id: [] for node in workflow.nodes}
+            for edge in workflow.edges:
+                if edge.target in deps:
+                    deps[edge.target].append(edge.source)
+            
+            # 2. Determine Nodes to Execute
+            if node_ids:
+                node_map = {node.id: node for node in workflow.nodes}
+                nodes_to_run = [node_map[nid] for nid in node_ids if nid in node_map]
+            else:
+                nodes_to_run = self._topological_sort(workflow.nodes, deps)
+
+            # 3. Execute Nodes
+            for node in nodes_to_run:
+                try:
+                    # Signal node start
+                    yield f"data: {json.dumps({'type': 'node_started', 'node_id': node.id})}\n\n"
+                    
+                    # Resolve Inputs
+                    inputs = self._resolve_inputs(node, workflow.edges, context)
+                    
+                    # Execute Node Logic
+                    output = await self._execute_node(node, inputs, user_id, db, context=context, use_cache=use_cache)
+                    
+                    # Store Output
+                    context[node.id] = output
+                    
+                    # Signal node completion
+                    res = ExecutionResult(node_id=node.id, status="completed", output=output)
+                    yield f"data: {json.dumps({'type': 'node_completed', 'node_id': node.id, 'result': res.model_dump()})}\n\n"
+                    
+                except asyncio.CancelledError:
+                    logger.info(f"[KILL] Execution {execution_id} was cancelled during node {node.id}.")
+                    yield f"data: {json.dumps({'type': 'execution_cancelled', 'execution_id': execution_id})}\n\n"
+                    raise
+                except Exception as e:
+                    logger.error(f"Error executing node {node.id}: {e}")
+                    res = ExecutionResult(node_id=node.id, status="failed", output=None, error=str(e))
+                    yield f"data: {json.dumps({'type': 'node_failed', 'node_id': node.id, 'result': res.model_dump()})}\n\n"
+            
+            yield f"data: {json.dumps({'type': 'workflow_completed'})}\n\n"
+        finally:
+            if execution_id and execution_id in self.active_tasks:
+                del self.active_tasks[execution_id]
+                logger.info(f"[KILL] Task cleaned up: {execution_id}")
 
     async def execute_workflow(self, workflow: Workflow, node_ids: List[str] = None, user_id: str = "default", db: Session = None, depth: int = 0, use_cache: bool = False) -> Dict[str, ExecutionResult]:
         """
@@ -301,6 +316,16 @@ class WorkflowEngine:
                 # For now, we continue, but downstream might fail due to missing context.
         
         return execution_results
+
+    def cancel_execution(self, execution_id: str):
+        """Cancels an active execution task."""
+        if execution_id in self.active_tasks:
+            task = self.active_tasks[execution_id]
+            task.cancel()
+            logger.info(f"[KILL] Cancel requested for: {execution_id}")
+            return True
+        logger.warning(f"[KILL] Cancellation failed: Execution {execution_id} not found.")
+        return False
 
     def _topological_sort(self, nodes: List[Node], deps: Dict[str, List[str]]) -> List[Node]:
         """

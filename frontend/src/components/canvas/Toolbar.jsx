@@ -1,9 +1,9 @@
 import React from 'react';
 import { Bot, Image as ImageIcon, FileInput, Eye, Play, Save, Upload, Download, ArrowUpCircle, Volume2, Video, Workflow, Trash, Film } from 'lucide-react';
 
-const Toolbar = ({ onDragStart, onAddNode, onRun, onSave, onImport, onExport, isRunning, useCache, setUseCache }) => {
+const Toolbar = ({ onDragStart, onAddNode, onRun, onKill, onSave, onImport, onExport, isRunning, useCache, setUseCache }) => {
   React.useEffect(() => {
-    console.log("Toolbar mounted - v2 (with Clear Cache)");
+    console.log("Toolbar mounted");
   }, []);
 
   return (
@@ -151,28 +151,24 @@ const Toolbar = ({ onDragStart, onAddNode, onRun, onSave, onImport, onExport, is
       <div className="toolbar-panel">
         <div className="toolbar-header">Actions</div>
 
-        <button
-          onClick={() => onRun()}
-          disabled={isRunning}
-          className="toolbar-btn run"
-        >
-          <Play size={16} color="white" />
-          <span className="text-white font-medium">
-            {isRunning ? 'Running...' : 'Run'}
-          </span>
-        </button>
-
-        {/* Cache Toggle */}
-        <div className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-xl border border-white/5">
-          <span className="text-xs font-medium text-gray-400">Cache</span>
+        {isRunning ? (
           <button
-            onClick={() => setUseCache && setUseCache(!useCache)}
-            className={`w-8 h-4 rounded-full transition-colors relative ${useCache ? 'bg-green-500' : 'bg-gray-600'}`}
-            title={useCache ? "Cache Enabled" : "Cache Disabled"}
+            onClick={() => onKill && onKill()}
+            className="toolbar-btn run kill"
           >
-            <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${useCache ? 'left-4.5' : 'left-0.5'}`} style={{ left: useCache ? '18px' : '2px' }} />
+            <Trash size={16} color="white" />
+            <span className="text-white font-medium">Kill Execution</span>
           </button>
-        </div>
+        ) : (
+            <button
+              onClick={() => onRun()}
+              className="toolbar-btn run"
+            >
+              <Play size={16} color="white" />
+              <span className="text-white font-medium">Run</span>
+            </button>
+        )}
+
 
 
         <button onClick={onSave} className="toolbar-btn secondary">
@@ -198,23 +194,6 @@ const Toolbar = ({ onDragStart, onAddNode, onRun, onSave, onImport, onExport, is
           <span className="node-label">Export</span>
         </button>
 
-        <button
-          onClick={async () => {
-            if (confirm("Clear execution cache?")) {
-              try {
-                await fetch('/api/workflow/cache/clear', { method: 'POST' });
-                alert("Cache cleared!");
-              } catch (e) {
-                console.error(e);
-                alert("Failed to clear cache: " + e);
-              }
-            }
-          }}
-          className="toolbar-btn secondary"
-        >
-          <Trash size={16} color="#d1d5db" />
-          <span className="node-label">Clear Cache</span>
-        </button>
       </div>
     </div>
   );
