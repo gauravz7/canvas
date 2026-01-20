@@ -143,40 +143,45 @@ class EditorExecutor(BaseNodeExecutor):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
         try:
-            # Helper to check if file has audio
-            async def has_audio(path):
+            # Helper to get audio status and duration
+            async def get_media_info(path):
                 try:
-                    cmd = ["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=codec_type", "-of", "csv=p=0", path]
+                    cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration:stream=codec_type", "-of", "json", path]
                     proc = await asyncio.create_subprocess_exec(*cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     stdout, _ = await proc.communicate()
-                    return "audio" in stdout.decode().lower()
-                except:
-                    return False
+                    info = json.loads(stdout.decode())
+                    has_a = any(s.get("codec_type") == "audio" for s in info.get("streams", []))
+                    duration = float(info.get("format", {}).get("duration", 0))
+                    return has_a, duration
+                except Exception as e:
+                    self.logger.warning(f"ffprobe failed for {path}: {e}")
+                    return False, 0.0
 
             cmd = ["ffmpeg", "-y"]
             input_args = []
             filter_complex = []
             
-            # Identify which segments have audio
-            vid_has_audio = []
+            # Identify which segments have audio and their durations
+            vid_info = []
             for v in video_paths:
                 input_args.extend(["-i", v["path"]])
-                vid_has_audio.append(await has_audio(v["path"]))
+                info = await get_media_info(v["path"])
+                vid_info.append(info)
 
             # Audio-only inputs (speech, bg)
             # (We already resolved paths, just need to add to input_args later)
             
             # Video processing
-            for i, v in enumerate(video_paths):
+            for i, (v, (has_a, dur)) in enumerate(zip(video_paths, vid_info)):
                 # Video stream: Scale and Pad
                 filter_complex.append(f"[{i}:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p[v{i}]")
                 
                 # Audio stream: Use source if exists, otherwise generate silence
-                if vid_has_audio[i]:
-                    filter_complex.append(f"[{i}:a]volume={v['volume']}[va{i}]")
+                if has_a:
+                    filter_complex.append(f"[{i}:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,volume={v['volume']}[va{i}]")
                 else:
-                    # Generate silence of same duration as video
-                    filter_complex.append(f"anullsrc=channel_layout=stereo:sample_rate=44100[asilent{i}];[asilent{i}]volume={v['volume']}[va{i}]")
+                    # Generate finite silence matching video duration
+                    filter_complex.append(f"anullsrc=channel_layout=stereo:sample_rate=44100:d={dur},volume={v['volume']}[va{i}]")
             
             # Concatenate Normalized Videos
             if video_paths:
@@ -190,18 +195,19 @@ class EditorExecutor(BaseNodeExecutor):
             
             # Speech inputs
             curr_idx = len(video_paths)
-            speech_has_audio = []
+            speech_info = []
             for i, s in enumerate(speech_paths):
                 input_args.extend(["-i", s["path"]])
-                speech_has_audio.append(await has_audio(s["path"]))
+                info = await get_media_info(s["path"])
+                speech_info.append(info)
             
-            for i, s in enumerate(speech_paths):
+            for i, (s, (has_a, dur)) in enumerate(zip(speech_paths, speech_info)):
                 idx = curr_idx + i
-                if speech_has_audio[i]:
-                    filter_complex.append(f"[{idx}:a]volume={s['volume']}[sa{i}]")
+                if has_a:
+                    filter_complex.append(f"[{idx}:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,volume={s['volume']}[sa{i}]")
                 else:
                     # This shouldn't really happen for speech/music nodes but let's be safe
-                    filter_complex.append(f"anullsrc=channel_layout=stereo:sample_rate=44100[sa{i}]")
+                    filter_complex.append(f"anullsrc=channel_layout=stereo:sample_rate=44100:d={dur},volume={s['volume']}[sa{i}]")
             
             if speech_paths:
                 if len(speech_paths) > 1:
@@ -214,8 +220,8 @@ class EditorExecutor(BaseNodeExecutor):
             curr_idx = len(video_paths) + len(speech_paths)
             for i, b in enumerate(bg_paths):
                 input_args.extend(["-i", b["path"]])
-                # We assume background tracks have audio
-                filter_complex.append(f"[{curr_idx + i}:a]volume={b['volume']}[ba{i}]")
+                # We assume background tracks have audio, but still resample
+                filter_complex.append(f"[{curr_idx + i}:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,volume={b['volume']}[ba{i}]")
             
             # FINAL MIX
             mix_inputs = []
