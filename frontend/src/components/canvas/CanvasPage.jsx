@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { ReactFlow, Background, useNodesState, useEdgesState, addEdge, useReactFlow } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import './Canvas.css';
@@ -9,6 +10,7 @@ import UpscaleNode from './nodes/UpscaleNode';
 import SpeechNode from './nodes/SpeechNode';
 import VeoNode from './nodes/VeoNode';
 import MusicNode from './nodes/MusicNode';
+import EditorNode from './nodes/EditorNode';
 import Toolbar from './Toolbar';
 import { Plus, Minus, Maximize, ZoomIn, ZoomOut } from 'lucide-react';
 
@@ -43,14 +45,18 @@ const nodeTypes = {
   veo_standard: VeoNode,
   veo_extend: VeoNode,
   veo_reference: VeoNode,
-
+  editor: EditorNode,
 };
 
 const CanvasPage = () => {
+  React.useEffect(() => {
+    console.log("CanvasPage mounted - nodeTypes:", Object.keys(nodeTypes));
+  }, []);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [useCache, setUseCache] = useState(false);
+  const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const reactFlowWrapper = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -158,6 +164,7 @@ const CanvasPage = () => {
       else if (type === 'veo_standard') label = 'Veo Standard';
       else if (type === 'veo_extend') label = 'Veo Extend';
       else if (type === 'veo_reference') label = 'Veo Reference';
+      else if (type === 'editor') label = 'Video Editor';
       else label = 'Node';
 
       const newNode = {
@@ -214,7 +221,7 @@ const CanvasPage = () => {
     let label = '';
     if (type === 'gemini_text') label = 'Gemini Text';
     else if (type === 'gemini_image') label = 'Gemini Image';
-    else if (type === 'input') label = subtype === 'image' ? 'Image Input' : 'Text Input';
+    else if (type === 'input') label = subtype === 'image' ? 'Image Input' : subtype === 'video' ? 'Video Input' : subtype === 'audio' ? 'Audio Input' : 'Text Input';
     else if (type === 'output') {
       if (subtype === 'image') label = 'Image Output';
       else if (subtype === 'video') label = 'Video Output';
@@ -227,6 +234,7 @@ const CanvasPage = () => {
     else if (type === 'veo_standard') label = 'Veo Standard';
     else if (type === 'veo_extend') label = 'Veo Extend';
     else if (type === 'veo_reference') label = 'Veo Reference';
+    else if (type === 'editor') label = 'Video Editor';
     else label = 'Node';
 
     const newNode = {
@@ -251,7 +259,6 @@ const CanvasPage = () => {
         },
         onDelete: () => handleDeleteNode(id),
         onRunPartial: () => handlePartialRun(id),
-        // Keep legacy onChange for backward compat if needed (InputNode might use it)
         onChange: (val) => {
           setNodes((nds) => nds.map((node) => {
             if (node.id === id) {
@@ -262,6 +269,7 @@ const CanvasPage = () => {
         }
       },
     };
+
     setNodes((nds) => nds.concat(newNode));
   };
 
@@ -291,7 +299,7 @@ const CanvasPage = () => {
     handleRun(Array.from(downstreamIds));
   }, []); // Empty deps as we use refs for state access
 
-  const handleRun = useCallback(async (nodeIds = null) => {
+  const handleRun = async (nodeIds = null) => {
     if (isRunning) {
       console.warn("Already running, skipping run request");
       return;
@@ -327,15 +335,15 @@ const CanvasPage = () => {
           workflow: {
             id: "workflow-" + uuidv4(),
             name: "Untitled Workflow",
-            nodes: currentNodes.map(n => ({
-              id: n.id,
-              type: n.type,
-              position: n.position,
-              data: {
-                ...n.data,
-                value: n.data.value
-              }
-            })),
+            nodes: currentNodes.map(n => {
+              const { onUpdate, onDelete, onRunPartial, onChange, ...cleanData } = n.data;
+              return {
+                id: n.id,
+                type: n.type,
+                position: n.position,
+                data: cleanData
+              };
+            }),
             edges: currentEdges.map(e => ({
               id: e.id,
               source: e.source,
@@ -344,8 +352,8 @@ const CanvasPage = () => {
               targetHandle: e.targetHandle
             }))
           },
-          node_ids: nodeIds,
-          use_cache: useCache // Pass cache state
+          node_ids: runNodeIds,
+          use_cache: useCache
         }),
       });
 
@@ -381,7 +389,8 @@ const CanvasPage = () => {
                     : n
                 )
               );
-            } else if (data.type === 'node_completed' || data.type === 'node_failed') {
+            } else if (data.type === 'node_completed' || data.type === 'node_completed_cache' || data.type === 'node_failed') {
+              const isCache = data.type === 'node_completed_cache';
               setNodes((nds) =>
                 nds.map((n) =>
                   n.id === data.node_id
@@ -389,13 +398,15 @@ const CanvasPage = () => {
                       ...n,
                       data: {
                         ...n.data,
-                        status: data.type === 'node_completed' ? 'completed' : 'failed',
+                        status: data.type === 'node_failed' ? 'failed' : 'completed',
                         executionResult: data.result,
+                        // If it was cached, we might want to indicate it, but 'completed' is fine
                       },
                     }
                     : n
                 )
               );
+              if (isCache) console.log(`Node ${data.node_id} used cache`);
             } else if (data.type === 'workflow_completed') {
               setIsRunning(false);
             }
@@ -407,25 +418,17 @@ const CanvasPage = () => {
     } catch (error) {
       console.error('Execution Error:', error);
       setIsRunning(false);
+      alert('Execution error: ' + error.message);
     }
-  }, [useCache]); // Add useCache to deps
+  };
 
   const handleSave = async () => {
-    const name = prompt("Enter workflow name:", "My Workflow");
-    if (!name) return;
-
-    const workflow = {
-      id: uuidv4(), // Or reuse if loaded
-      name: name,
-      nodes: nodes,
-      edges: edges
-    };
-
     try {
+      const flow = reactFlowInstance.toObject();
       const response = await fetch('/api/workflow/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(workflow)
+        body: JSON.stringify(flow)
       });
       if (response.ok) {
         alert('Workflow saved!');
@@ -440,28 +443,68 @@ const CanvasPage = () => {
   const handleExport = () => {
     const includeMedia = window.confirm("Include media (images, videos, voice) in the export? \n\nChoose 'Cancel' for a lightweight JSON (no images/videos/voice) for sharing.");
 
-    let nodesToExport = nodes;
-    if (!includeMedia) {
-      nodesToExport = nodes.map(node => ({
-        ...node,
-        data: {
-          ...node.data,
-          executionResult: null,
-          value: (typeof node.data.value === 'string' && (node.data.value?.startsWith?.('data:') || node.data.value.length > 500))
-            ? ""
-            : node.data.value
-        }
-      }));
-    }
+    // Create a deep-ish clone that strips functions
+    const cleanNodes = nodes.map(node => {
+      const cleanData = { ...node.data };
 
-    const exportData = { nodes: nodesToExport, edges };
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", includeMedia ? "workflow_full.json" : "workflow_light.json");
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
+      // Strip functions and internal non-serializable refs
+      delete cleanData.onUpdate;
+      delete cleanData.onDelete;
+      delete cleanData.onRunPartial;
+      delete cleanData.onChange;
+
+      if (!includeMedia) {
+        // Strip execution results and large values
+        delete cleanData.executionResult;
+        delete cleanData.status;
+
+        if (typeof cleanData.value === 'string' && (cleanData.value.startsWith('data:') || cleanData.value.length > 500)) {
+          cleanData.value = "";
+        }
+
+        if (node.type === 'input') {
+          delete cleanData.fileName;
+          delete cleanData.lastRun;
+        }
+      }
+
+      return {
+        ...node,
+        data: cleanData
+      };
+    });
+
+    const exportData = {
+      nodes: cleanNodes,
+      edges: edges.map(e => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        sourceHandle: e.sourceHandle,
+        targetHandle: e.targetHandle
+      }))
+    };
+
+    try {
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+
+      const downloadAnchorNode = document.createElement('a');
+      const fileName = includeMedia ? "workflow_full.json" : "workflow_light.json";
+
+      downloadAnchorNode.setAttribute("href", url);
+      downloadAnchorNode.setAttribute("download", fileName);
+      document.body.appendChild(downloadAnchorNode);
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+
+      // Revoke the object URL after a delay to free memory
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Export failed: " + err.message);
+    }
   };
 
   const handleImport = (event) => {
@@ -498,6 +541,7 @@ const CanvasPage = () => {
           onConnect={onConnect}
           onDragOver={onDragOver}
           onDrop={onDrop}
+          onInit={setReactFlowInstance}
           nodeTypes={nodeTypes}
           fitView
           className="bg-black"
@@ -519,6 +563,7 @@ const CanvasPage = () => {
           setUseCache={setUseCache}
         />
       </div>
+
     </div>
   );
 };

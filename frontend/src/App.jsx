@@ -9,6 +9,7 @@ import {
   History,
   LayoutGrid, // Modern icon for Canvas
   AppWindow, // Modern icon for Studio
+  Infinity, // Icon for Branding
 } from 'lucide-react';
 
 import { ConfigProvider } from './contexts/ConfigContext';
@@ -37,8 +38,21 @@ function App() {
           <aside className="w-64 flex flex-col sidebar-border bg-black-60 backdrop-blur-2xl">
             {/* Header / Branding */}
             <div className="p-6">
-              <h1 className="text-2xl font-bold text-gradient-brand tracking-tighter">
-                Infinite Canvas
+              <h1 className="text-2xl font-bold flex items-center gap-2 tracking-tighter">
+                <span className="text-gradient-brand flex items-center gap-2">
+                  <div className="infinity-container">
+                    <Infinity size={28} strokeWidth={2.5} className="infinity-main" />
+                    {/* SVG tracer that follows the path */}
+                    <svg width="28" height="28" viewBox="0 0 24 24" className="infinity-tracer-svg">
+                      <path
+                        d="M18.18 17.77C15.81 19.32 12.18 19.32 9.81 17.77L5.82 15.11C3.45 13.56 3.45 9.92 5.82 8.37C8.19 6.82 11.82 6.82 14.19 8.37L18.18 11.03C20.55 12.58 20.55 16.22 18.18 17.77Z"
+                        className="infinity-tracer-path"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </div>
+                  <span>Canvas</span>
+                </span>
               </h1>
               <p className="text-xs font-medium text-white-40 mt-1 tracking-wide uppercase">
                 Multimodal Orchestrator

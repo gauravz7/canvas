@@ -13,6 +13,7 @@ class NodeType(str, Enum):
     VEO_STANDARD = "veo_standard"
     VEO_EXTEND = "veo_extend"
     VEO_REFERENCE = "veo_reference"
+    EDITOR = "editor"
     WORKFLOW = "workflow" # Nested workflow
 
 class ParamType(str, Enum):

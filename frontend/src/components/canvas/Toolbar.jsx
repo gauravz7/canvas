@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, Image as ImageIcon, FileInput, Eye, Play, Save, Upload, Download, ArrowUpCircle, Volume2, Video, Workflow, Trash } from 'lucide-react';
+import { Bot, Image as ImageIcon, FileInput, Eye, Play, Save, Upload, Download, ArrowUpCircle, Volume2, Video, Workflow, Trash, Film } from 'lucide-react';
 
 const Toolbar = ({ onDragStart, onAddNode, onRun, onSave, onImport, onExport, isRunning, useCache, setUseCache }) => {
   React.useEffect(() => {
@@ -132,6 +132,16 @@ const Toolbar = ({ onDragStart, onAddNode, onRun, onSave, onImport, onExport, is
         >
           <ArrowUpCircle size={16} className="text-purple-400" color="#c084fc" />
           <span className="node-label">Image Upscaler</span>
+        </div>
+
+        <div
+          className="node-item"
+          onDragStart={(event) => onDragStart(event, 'editor')}
+          onClick={() => onAddNode('editor')}
+          draggable
+        >
+          <Film size={16} className="text-indigo-400" color="#818cf8" />
+          <span className="node-label">Video Editor</span>
         </div>
 
 

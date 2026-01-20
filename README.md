@@ -12,6 +12,7 @@ graph TD
     Backend <--> |Vertex AI SDK| Veo[Google Veo Video]
     Backend <--> |Google Cloud Storage| Storage[(GCS Bucket)]
     Backend <--> |Local System| Audio[Audio Processing]
+    Backend <--> |FFmpeg CLI| Editor[Video Editor Executor]
 ```
 
 ## 🚀 Local Development
@@ -76,8 +77,10 @@ chmod +x deploy.sh
 ## 🛠️ To-Dos & Requirements
 - [x] Integrate Gemini 2.0 for Image Generation.
 - [x] Integrate Veo for Video Generation.
+- [x] Video Editor Node for multi-track sequencing (FFmpeg).
 - [x] Custom Node-based Canvas UI.
 - [x] History Panel with thumbnails and scroller.
+- [x] Premium Branding with Infinity Icon & Animations.
 - [ ] Implement user authentication.
 - [ ] Add support for custom fine-tuned models.
 

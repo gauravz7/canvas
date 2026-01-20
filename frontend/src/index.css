@@ -108,6 +108,123 @@ button {
   color: transparent;
 }
 
+.fixed {
+  position: fixed;
+}
+
+.inset-0 {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.bg-black\/80 {
+  background-color: rgba(0, 0, 0, 0.8);
+}
+
+.z-\[9999\] {
+  z-index: 9999;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.max-w-md {
+  max-width: 28rem;
+}
+
+.shadow-2xl {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.animate-in {
+  animation-duration: 200ms;
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: fadeIn;
+}
+
+.zoom-in {
+  animation-name: zoomIn;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes zoomIn {
+  from {
+    transform: scale(0.95);
+  }
+
+  to {
+    transform: scale(1);
+  }
+}
+
+/* Infinity Icon Animations */
+.infinity-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.infinity-main {
+  filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.5));
+  animation: infinity-glow 3s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes infinity-glow {
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 5px rgba(96, 165, 250, 0.3));
+  }
+
+  50% {
+    filter: drop-shadow(0 0 15px rgba(96, 165, 250, 0.7));
+  }
+}
+
+.infinity-tracer-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.infinity-tracer-path {
+  stroke: rgba(226, 232, 240, 0.8);
+  /* Silver line */
+  stroke-width: 2.5;
+  fill: none;
+  stroke-dasharray: 20 80;
+  /* Short segment followed by gap */
+  animation: trace-move 3s linear infinite;
+}
+
+@keyframes trace-move {
+  from {
+    stroke-dashoffset: 100;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
 .tracking-tighter {
   letter-spacing: -0.05em;
 }

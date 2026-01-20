@@ -47,7 +47,10 @@ const OutputNode = ({ data, isConnectable, selected }) => {
       const showAudio = hasStandardAudio || hasDirectAudio;
 
       // 2. Video Component Detection
-      const hasVideos = processedRes.videos && Array.isArray(processedRes.videos) && processedRes.videos.length > 0;
+      const hasVideos = (processedRes.videos && Array.isArray(processedRes.videos) && processedRes.videos.length > 0);
+      const isDirectVideo = (processedRes.url || processedRes.data) && processedRes.mime_type && typeof processedRes.mime_type === 'string' && processedRes.mime_type.toLowerCase().includes('video');
+
+      const showVideo = hasVideos || isDirectVideo;
 
       // 3. Image Component Detection
       const hasImages = processedRes.images && Array.isArray(processedRes.images) && processedRes.images.length > 0;
@@ -63,7 +66,7 @@ const OutputNode = ({ data, isConnectable, selected }) => {
           textContent = processedRes.text || processedRes.thoughts;
         }
         // If NO media found, dump JSON
-        else if (!showAudio && !hasVideos && !hasImages && !isDirectImage) {
+        else if (!showAudio && !showVideo && !hasImages && !isDirectImage) {
           textContent = JSON.stringify(processedRes, null, 2);
         }
       }
@@ -105,16 +108,49 @@ const OutputNode = ({ data, isConnectable, selected }) => {
 
 
           {/* Video Section */}
-          {hasVideos && (
+          {showVideo && (
             <div className="flex flex-col gap-2">
-              {processedRes.videos.map((vid, idx) => (
-                <div key={idx} className="flex flex-col gap-1 bg-gray-900/50 p-2 rounded border border-gray-800">
+              {hasVideos ? (
+                processedRes.videos.map((vid, idx) => (
+                  <div key={idx} className="flex flex-col gap-1 bg-gray-900/50 p-2 rounded border border-gray-800">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] text-gray-500 font-medium">Video Result {idx + 1}:</span>
+                      {vid.url && (
+                        <a
+                          href={vid.url}
+                          download={`video_${idx + 1}.mp4`}
+                          className="text-[10px] text-blue-400 hover:text-blue-300 underline"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Download / External Link
+                        </a>
+                      )}
+                    </div>
+                    <video
+                      controls
+                      playsInline
+                      autoPlay={false}
+                      preload="metadata"
+                      crossOrigin="anonymous"
+                      className="w-full rounded bg-black aspect-video shadow-lg border border-orange-500/30"
+                      src={vid.url ? vid.url : ((typeof vid.data === 'string' && vid.data?.startsWith?.('data:')) ? vid.data : (vid.data ? `data:${vid.mime_type};base64,${vid.data}` : ''))}
+                      onError={(e) => {
+                        console.error("Video load error:", e);
+                        const msg = vid.url ? `Failed to load video. This might be a missing file or CORS issue. URL: ${vid.url}` : "Failed to load video data.";
+                        e.target.insertAdjacentHTML('afterend', `<div class="text-[10px] text-red-500 mt-2 font-bold p-2 bg-red-900/10 rounded">${msg}</div>`);
+                      }}
+                    />
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col gap-1 bg-gray-900/50 p-2 rounded border border-gray-800">
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] text-gray-500 font-medium">Video Result {idx + 1}:</span>
-                    {vid.url && (
+                    <span className="text-[10px] text-gray-500 font-medium">Video Result:</span>
+                    {processedRes.url && (
                       <a
-                        href={vid.url}
-                        download={`video_${idx + 1}.mp4`}
+                        href={processedRes.url}
+                        download={`video_result.mp4`}
                         className="text-[10px] text-blue-400 hover:text-blue-300 underline"
                         target="_blank"
                         rel="noopener noreferrer"
@@ -130,23 +166,15 @@ const OutputNode = ({ data, isConnectable, selected }) => {
                     preload="metadata"
                     crossOrigin="anonymous"
                     className="w-full rounded bg-black aspect-video shadow-lg border border-orange-500/30"
-                    src={vid.url ? vid.url : ((typeof vid.data === 'string' && vid.data?.startsWith?.('data:')) ? vid.data : (vid.data ? `data:${vid.mime_type};base64,${vid.data}` : ''))}
+                    src={processedRes.url ? processedRes.url : ((typeof processedRes.data === 'string' && processedRes.data?.startsWith?.('data:')) ? processedRes.data : (processedRes.data ? `data:${processedRes.mime_type};base64,${processedRes.data}` : ''))}
                     onError={(e) => {
                       console.error("Video load error:", e);
-                      const msg = vid.url ? `Failed to load video. This might be a missing file or CORS issue. URL: ${vid.url}` : "Failed to load video data.";
+                      const msg = processedRes.url ? `Failed to load video. This might be a missing file or CORS issue. URL: ${processedRes.url}` : "Failed to load video data.";
                       e.target.insertAdjacentHTML('afterend', `<div class="text-[10px] text-red-500 mt-2 font-bold p-2 bg-red-900/10 rounded">${msg}</div>`);
                     }}
                   />
-                  <div className="flex justify-center mt-2">
-                    <span className="text-[10px] text-orange-400 animate-pulse">Click the play button to view</span>
-                  </div>
-                  {vid.uri && (
-                    <div className="text-[8px] text-gray-600 truncate mt-1" title={vid.uri}>
-                      URI: {vid.uri}
-                    </div>
-                  )}
                 </div>
-              ))}
+              )}
             </div>
           )}
 
@@ -157,7 +185,7 @@ const OutputNode = ({ data, isConnectable, selected }) => {
             </div>
           )}
 
-          {!hasImages && !isDirectImage && !textContent && !showAudio && !hasVideos && (
+          {!hasImages && !isDirectImage && !textContent && !showAudio && !showVideo && (
             <div className="node-text-small text-gray-600 italic">Empty output</div>
           )}
         </div>

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from models import Workflow as WorkflowModel
 import hashlib
 import copy
+from .executors.editor_executor import EditorExecutor
 
 class ExecutionCache:
     _instance = None
@@ -41,6 +42,16 @@ logger = logging.getLogger(__name__)
 class WorkflowEngine:
     def __init__(self):
         self.cache = ExecutionCache()
+        self.services = {
+            'gemini': gemini_service,
+            'veo': veo_service,
+            'vertex': vertex_service,
+            'storage': storage_service,
+            'engine': self
+        }
+        self.executors = {
+            'editor': EditorExecutor(self.services)
+        }
 
     def _compute_cache_key(self, node: Node, inputs: Dict[str, Any]) -> str:
         """Computes a stable hash for cache key based on node config and resolved inputs."""
@@ -206,7 +217,7 @@ class WorkflowEngine:
                 inputs = self._resolve_inputs(node, workflow.edges, context)
                 
                 # Execute Node Logic
-                output = await self._execute_node(node, inputs, user_id, db, use_cache=use_cache)
+                output = await self._execute_node(node, inputs, user_id, db, context=context, use_cache=use_cache)
                 
                 # Store Output
                 context[node.id] = output
@@ -269,7 +280,7 @@ class WorkflowEngine:
                 inputs = self._resolve_inputs(node, workflow.edges, context)
                 
                 # Execute Node Logic
-                output = await self._execute_node(node, inputs, user_id, db, depth, use_cache=use_cache)
+                output = await self._execute_node(node, inputs, user_id, db, depth, context=context, use_cache=use_cache)
                 
                 # Store Output
                 context[node.id] = output
@@ -368,7 +379,7 @@ class WorkflowEngine:
         
         return inputs
 
-    async def _execute_node(self, node: Node, inputs: Dict[str, Any], user_id: str, db: Session = None, depth: int = 0, use_cache: bool = False) -> Any:
+    async def _execute_node(self, node: Node, inputs: Dict[str, Any], user_id: str, db: Session = None, depth: int = 0, context: Dict[str, Any] = None, use_cache: bool = False) -> Any:
         # 0. Check Cache
         cache_key = None
         if use_cache:
@@ -379,7 +390,7 @@ class WorkflowEngine:
                     logger.info(f"[CACHE HIT] Node {node.id}")
                     return cached_result
         
-        result = await self._execute_node_logic(node, inputs, user_id, db, depth)
+        result = await self._execute_node_logic(node, inputs, user_id, db, depth, context)
         
         # Cache Result
         if use_cache and cache_key and result is not None:
@@ -388,7 +399,7 @@ class WorkflowEngine:
              
         return result
 
-    async def _execute_node_logic(self, node: Node, inputs: Dict[str, Any], user_id: str, db: Session = None, depth: int = 0) -> Any:
+    async def _execute_node_logic(self, node: Node, inputs: Dict[str, Any], user_id: str, db: Session = None, depth: int = 0, context: Dict[str, Any] = None) -> Any:
 
         # 1. INPUT Node
         if node.type == NodeType.INPUT:
@@ -836,6 +847,10 @@ class WorkflowEngine:
                       final_output[out_node.id] = results[out_node.id].output
             
             return final_output
+
+        # 9. EDITOR Node
+        if node.type == NodeType.EDITOR:
+            return await self.executors['editor'].execute(node, inputs, user_id, context)
 
         return None
 
