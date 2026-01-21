@@ -328,7 +328,7 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
                       selectedWorkflow?.id === wf.id ? 'bg-blue-600/20 text-blue-400 border border-blue-500/20' : 'text-white-60 hover:bg-white-5 hover:text-white'
                     }`}
                   >
-                    <span className="text-sm font-medium truncate">{wf.name}</span>
+                    <span className="text-sm font-medium truncate text-white">{wf.name}</span>
                     <ChevronRight size={14} className={`transition-transform duration-300 ${selectedWorkflow?.id === wf.id ? 'translate-x-1' : 'opacity-0'}`} />
                   </button>
                 ))}
