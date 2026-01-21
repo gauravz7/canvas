@@ -45,6 +45,12 @@ button {
 
 input {
   font-family: inherit;
+  background-color: transparent;
+    color: inherit;
+  }
+  
+  input:focus {
+    outline: none;
 }
 /* Utilities */
 .bg-black {

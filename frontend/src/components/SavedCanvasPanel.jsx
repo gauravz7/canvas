@@ -345,7 +345,7 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
                       className={`flex-1 text-left p-3 rounded-l-xl transition-all group flex items-center justify-between ${selectedWorkflow?.id === wf.id ? 'bg-indigo-600/20 text-indigo-400 border-y border-l border-indigo-500/20' : 'text-white-60 hover:bg-white-5 hover:text-white'
                         }`}
                     >
-                      <span className="text-sm font-medium truncate">{wf.name}</span>
+                      <span className="text-sm font-medium truncate text-white">{wf.name}</span>
                       <ChevronRight size={14} className={`transition-transform duration-300 ${selectedWorkflow?.id === wf.id ? 'translate-x-1' : 'opacity-0'}`} />
                     </button>
                     <button
