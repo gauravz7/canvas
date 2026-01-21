@@ -48,7 +48,7 @@ const nodeTypes = {
   editor: EditorNode,
 };
 
-const CanvasPage = () => {
+const CanvasPage = ({ userId = 'default_user' }) => {
   React.useEffect(() => {
     console.log("CanvasPage mounted - nodeTypes:", Object.keys(nodeTypes));
   }, []);
@@ -475,7 +475,7 @@ const CanvasPage = () => {
         id: workflowId,
         name: workflowName
       };
-      const response = await fetch('/api/workflow/save', {
+      const response = await fetch(`/api/workflow/save?user_id=${userId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

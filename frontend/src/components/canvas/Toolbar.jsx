@@ -159,7 +159,7 @@ const Toolbar = ({ onDragStart, onAddNode, onRun, onKill, onSave, onImport, onEx
             type="text"
             value={workflowName}
             onChange={(e) => setWorkflowName(e.target.value)}
-            className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+            className="w-full bg-[#1e1e1e] border border-white/20 rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all font-medium"
             placeholder="Enter workflow name..."
           />
         </div>

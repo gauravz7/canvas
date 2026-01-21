@@ -43,6 +43,9 @@ button {
   font-family: inherit;
 }
 
+input {
+  font-family: inherit;
+}
 /* Utilities */
 .bg-black {
   background-color: #000;
@@ -345,6 +348,42 @@ button {
   color: #34d399;
 }
 
+/* Opacity-based Colors */
+.text-white-90 {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.text-white-80 {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.text-white-70 {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.text-white-60 {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.text-white-50 {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.text-white-40 {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.text-white-30 {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.text-white-20 {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.text-white-10 {
+  color: rgba(255, 255, 255, 0.1);
+}
 /* User Identity */
 .p-4 {
   padding: 1rem;

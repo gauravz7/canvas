@@ -132,7 +132,7 @@ function App() {
           <main className="flex-1 relative overflow-hidden bg-main-gradient">
             {activeTab === 'canvas' && (
               <div className="absolute inset-0 z-0">
-                <CanvasPage />
+                <CanvasPage userId={userId} />
               </div>
             )}
 
