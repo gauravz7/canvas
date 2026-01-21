@@ -143,13 +143,13 @@ function App() {
             )}
 
             {activeTab === 'templates' && (
-              <div className="absolute inset-0 z-10 p-8 overflow-y-auto custom-scrollbar">
+              <div className="absolute inset-0 z-10 overflow-y-auto custom-scrollbar">
                 <SavedCanvasPanel userId={userId} onSwitchToCanvas={() => setActiveTab('canvas')} />
               </div>
             )}
 
             {activeTab === 'history' && (
-              <div className="absolute inset-0 z-10 p-8 overflow-y-auto custom-scrollbar">
+              <div className="absolute inset-0 z-10 overflow-y-auto custom-scrollbar">
                 <HistoryPanel userId={userId} />
               </div>
             )}
