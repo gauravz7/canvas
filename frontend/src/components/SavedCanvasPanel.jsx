@@ -22,6 +22,15 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [inputs, setInputs] = useState({});
   const [results, setResults] = useState(null);
+  const resultsRef = React.useRef(null);
+
+  useEffect(() => {
+    if (results && resultsRef.current) {
+      setTimeout(() => {
+        resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [results]);
 
   useEffect(() => {
     fetchData();
@@ -237,13 +246,27 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
     if (!results) return null;
 
     // Filter output nodes
+    // Filter output nodes or nodes with media content
     const outputResults = Object.entries(results).filter(([id, res]) => {
         const node = selectedWorkflow.nodes.find(n => n.id === id);
-        return node && node.type === 'output';
+      if (!node) return false;
+
+      // Always include Output nodes
+      if (node.type === 'output') return true;
+
+      // Also include any node that produced a media string (data URI or URL)
+      if (typeof res.output === 'string') {
+        return res.output.startsWith('data:image') ||
+          res.output.startsWith('data:video') ||
+          res.output.startsWith('data:audio') ||
+          res.output.startsWith('http'); // URLs
+      }
+
+      return false;
     });
 
     return (
-      <div className="mt-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div ref={resultsRef} className="mt-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-16">
         <div className="flex items-center justify-between border-b border-white-10 pb-4">
           <h3 className="text-lg font-semibold text-white-90 uppercase tracking-widest text-xs opacity-50">
             Execution Results

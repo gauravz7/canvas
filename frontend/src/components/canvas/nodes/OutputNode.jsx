@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeResizer } from '@xyflow/react';
-import { Eye, Image as ImageIcon, X, Play } from 'lucide-react';
+import { Eye, Image as ImageIcon, X, Play, Download } from 'lucide-react';
 
 const OutputNode = ({ data, isConnectable, selected }) => {
   const renderContent = () => {
@@ -75,8 +75,27 @@ const OutputNode = ({ data, isConnectable, selected }) => {
         <div className="flex flex-col gap-3">
           {/* Audio Section - Display FIRST if present */}
           {showAudio && (
-            <div className="flex flex-col gap-2 bg-gray-900/50 p-2 rounded border border-gray-800">
-              <span className="text-[10px] text-gray-500 font-medium">Audio Result:</span>
+            <div className="flex flex-col gap-2 bg-gray-900/50 p-2 rounded border border-gray-800 relative group/audio">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[10px] text-gray-500 font-medium">Audio Result:</span>
+                {(() => {
+                  const audioSrc = hasStandardAudio
+                    ? (processedRes.audio.url || (processedRes.audio.data?.startsWith?.('data:') ? processedRes.audio.data : `data:${processedRes.audio.mime_type};base64,${processedRes.audio.data}`))
+                    : (processedRes.url || (processedRes.data?.startsWith?.('data:') ? processedRes.data : `data:${processedRes.mime_type};base64,${processedRes.data}`));
+                  return audioSrc ? (
+                    <a
+                      href={audioSrc}
+                      download={`audio_${Date.now()}.mp3`}
+                      className="opacity-0 group-hover/audio:opacity-100 transition-opacity text-blue-400 hover:text-blue-300"
+                      title="Download Audio"
+                      target={audioSrc.startsWith('data:') ? undefined : "_blank"}
+                      rel={audioSrc.startsWith('data:') ? undefined : "noopener noreferrer"}
+                    >
+                      <Download size={14} />
+                    </a>
+                  ) : null;
+                })()}
+              </div>
               <audio
                 controls
                 className="w-full h-8"
@@ -92,18 +111,46 @@ const OutputNode = ({ data, isConnectable, selected }) => {
           {/* Image Section */}
           {hasImages && (
             <div className="flex flex-col gap-2">
-              {processedRes.images.map((img, idx) => (
-                <img
-                  key={idx}
-                  src={(typeof img.data === 'string' && img.data?.startsWith?.('data:')) ? img.data : (img.data ? `data:${img.mime_type};base64,${img.data}` : '')}
-                  alt={`Generated ${idx}`}
-                  className="node-file-preview"
-                />
-              ))}
+              {processedRes.images.map((img, idx) => {
+                const src = (typeof img.data === 'string' && img.data?.startsWith?.('data:')) ? img.data : (img.data ? `data:${img.mime_type};base64,${img.data}` : '');
+                return (
+                  <div key={idx} className="relative group/image">
+                    <img
+                      src={src}
+                      alt={`Generated ${idx}`}
+                      className="node-file-preview w-full"
+                    />
+                    {src && (
+                      <a
+                        href={src}
+                        download={`image_${idx + 1}_${Date.now()}.png`}
+                        className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded border border-white/20 text-white opacity-0 group-hover/image:opacity-100 transition-opacity z-10"
+                        title="Download Image"
+                        target={src.startsWith('data:') ? undefined : "_blank"}
+                        rel={src.startsWith('data:') ? undefined : "noopener noreferrer"}
+                      >
+                        <Download size={14} />
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
           {isDirectImage && (
-            <img src={processedRes} alt="Direct Output" className="node-file-preview" />
+            <div className="relative group/image">
+              <img src={processedRes} alt="Direct Output" className="node-file-preview w-full" />
+              <a
+                href={processedRes}
+                download={`image_${Date.now()}.png`}
+                className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded border border-white/20 text-white opacity-0 group-hover/image:opacity-100 transition-opacity z-10"
+                title="Download Image"
+                target={processedRes.startsWith('data:') ? undefined : "_blank"}
+                rel={processedRes.startsWith('data:') ? undefined : "noopener noreferrer"}
+              >
+                <Download size={14} />
+              </a>
+            </div>
           )}
 
 
@@ -115,17 +162,21 @@ const OutputNode = ({ data, isConnectable, selected }) => {
                   <div key={idx} className="flex flex-col gap-1 bg-gray-900/50 p-2 rounded border border-gray-800">
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-[10px] text-gray-500 font-medium">Video Result {idx + 1}:</span>
-                      {vid.url && (
-                        <a
-                          href={vid.url}
-                          download={`video_${idx + 1}.mp4`}
-                          className="text-[10px] text-blue-400 hover:text-blue-300 underline"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Download / External Link
-                        </a>
-                      )}
+                      {(() => {
+                        const vidSrc = vid.url ? vid.url : ((typeof vid.data === 'string' && vid.data?.startsWith?.('data:')) ? vid.data : (vid.data ? `data:${vid.mime_type};base64,${vid.data}` : ''));
+                        return vidSrc ? (
+                          <a
+                            href={vidSrc}
+                            download={`video_${idx + 1}_${Date.now()}.mp4`}
+                            className="text-blue-400 hover:text-blue-300"
+                            target={vidSrc.startsWith('data:') ? undefined : "_blank"}
+                            rel={vidSrc.startsWith('data:') ? undefined : "noopener noreferrer"}
+                            title="Download Video"
+                          >
+                            <Download size={14} />
+                          </a>
+                        ) : null;
+                      })()}
                     </div>
                     <video
                       controls
@@ -147,17 +198,21 @@ const OutputNode = ({ data, isConnectable, selected }) => {
                 <div className="flex flex-col gap-1 bg-gray-900/50 p-2 rounded border border-gray-800">
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-[10px] text-gray-500 font-medium">Video Result:</span>
-                    {processedRes.url && (
-                      <a
-                        href={processedRes.url}
-                        download={`video_result.mp4`}
-                        className="text-[10px] text-blue-400 hover:text-blue-300 underline"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Download / External Link
-                      </a>
-                    )}
+                      {(() => {
+                        const vidSrc = processedRes.url ? processedRes.url : ((typeof processedRes.data === 'string' && processedRes.data?.startsWith?.('data:')) ? processedRes.data : (processedRes.data ? `data:${processedRes.mime_type};base64,${processedRes.data}` : ''));
+                        return vidSrc ? (
+                          <a
+                          href={vidSrc}
+                          download={`video_result_${Date.now()}.mp4`}
+                          className="text-blue-400 hover:text-blue-300"
+                          target={vidSrc.startsWith('data:') ? undefined : "_blank"}
+                          rel={vidSrc.startsWith('data:') ? undefined : "noopener noreferrer"}
+                          title="Download Video"
+                        >
+                          <Download size={14} />
+                        </a>
+                        ) : null;
+                      })()}
                   </div>
                   <video
                     controls

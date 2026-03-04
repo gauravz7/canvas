@@ -12,6 +12,7 @@ class ModelConfig:
     # Image Generation/Editing
     GEMINI_IMAGE_MODELS = [
         "gemini-3-pro-image-preview",
+        "gemini-3.1-flash-image-preview",
         "gemini-2.5-flash-image",
     ]
     DEFAULT_GEMINI_IMAGE_MODEL = "gemini-3-pro-image-preview"

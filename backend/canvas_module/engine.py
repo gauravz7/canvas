@@ -211,6 +211,16 @@ class WorkflowEngine:
             if node_ids:
                 node_map = {node.id: node for node in workflow.nodes}
                 nodes_to_run = [node_map[nid] for nid in node_ids if nid in node_map]
+                
+                # Pre-populate context with existing outputs from nodes NOT in this run
+                for node in workflow.nodes:
+                    if node.id not in node_ids and node.data.executionResult:
+                        if isinstance(node.data.executionResult, dict) and 'output' in node.data.executionResult:
+                             context[node.id] = node.data.executionResult['output']
+                             logger.info(f"[FLOW-STREAM] Loaded existing context for {node.id}")
+                        elif node.data.executionResult:
+                             context[node.id] = node.data.executionResult
+                             logger.info(f"[FLOW-STREAM] Loaded direct context for {node.id}")
             else:
                 nodes_to_run = self._topological_sort(workflow.nodes, deps)
 
@@ -329,40 +339,46 @@ class WorkflowEngine:
 
     def _topological_sort(self, nodes: List[Node], deps: Dict[str, List[str]]) -> List[Node]:
         """
-        Returns a list of nodes in topological order.
+        Returns a list of nodes in topological order using Kahn's algorithm.
+        Properly handles multiple edges between the same nodes.
         """
-        # Calculate in-degree
-        in_degree = {node.id: 0 for node in nodes}
-        for u in deps:
-            for v in deps:
-                if u in deps[v]: # u is a dependency of v
-                     in_degree[v] += 1
+        node_map = {node.id: node for node in nodes}
         
-        # Actually deps is Target -> Sources (so Sources are dependencies)
-        # So in_degree of v is len(deps[v])
-        in_degree = {node.id: len(deps[node.id]) for node in nodes}
+        # 1. Calculate in-degree for each node
+        # deps is Target -> List of Sources
+        in_degree = {node.id: len(deps.get(node.id, [])) for node in nodes}
         
-        queue = [node for node in nodes if in_degree[node.id] == 0]
-        sorted_nodes = []
+        # 2. Build adjacency list: Source -> List of Targets
+        # This allows efficient traversal from a completed node to its dependents
+        adj = {node.id: [] for node in nodes}
+        for target_id, source_ids in deps.items():
+            for source_id in source_ids:
+                if source_id in adj:
+                    adj[source_id].append(target_id)
         
+        # 3. Initialize queue with nodes having 0 in-degree
+        queue = [node.id for node in nodes if in_degree[node.id] == 0]
+        sorted_ids = []
+        
+        # 4. Process queue
         while queue:
-            u = queue.pop(0)
-            sorted_nodes.append(u)
+            u_id = queue.pop(0)
+            sorted_ids.append(u_id)
             
-            # Find nodes v where u is a dependency (i.e. u -> v)
-            # We need the alignment: deps[v] contains u
-            for v_node in nodes:
-                if u.id in deps[v_node.id]:
-                    in_degree[v_node.id] -= 1
-                    if in_degree[v_node.id] == 0:
-                        queue.append(v_node)
+            # For each node v that depends on u
+            for v_id in adj.get(u_id, []):
+                in_degree[v_id] -= 1
+                if in_degree[v_id] == 0:
+                    queue.append(v_id)
+        
+        # 5. Result
+        sorted_nodes = [node_map[nid] for nid in sorted_ids if nid in node_map]
         
         if len(sorted_nodes) != len(nodes):
-            # Graph has cycle or disconnected parts? 
-            # Disconnected parts are handled by queue init. Cycle is the problem.
-            # Fallback to original order or just return what we have
-             pass
-        
+            logger.warning(f"Topological sort result length mismatch: {len(sorted_nodes)} vs {len(nodes)}. Possible cycle detected.")
+            # If mismatch, returning full list in original order as fallback to avoid skipping nodes entirely
+            return nodes
+            
         return sorted_nodes
 
     def _flatten(self, val: Any) -> List[Any]:
