@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiFetch } from '../utils/api';
 
 const ConfigContext = createContext(null);
 
@@ -10,7 +11,7 @@ export const ConfigProvider = ({ children }) => {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const res = await fetch('/api/config');
+        const res = await apiFetch('/api/config');
         if (!res.ok) throw new Error('Failed to load configuration');
         const data = await res.json();
         setConfig(data);

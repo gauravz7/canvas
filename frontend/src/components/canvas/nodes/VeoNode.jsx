@@ -80,7 +80,6 @@ const VeoNode = ({ data, isConnectable, selected }) => {
               >
                 <option value="16:9">16:9 (Landscape)</option>
                 <option value="9:16">9:16 (Portrait)</option>
-                <option value="1:1">1:1 (Square)</option>
               </select>
             </div>
 

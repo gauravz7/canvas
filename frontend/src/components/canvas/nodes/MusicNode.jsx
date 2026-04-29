@@ -2,7 +2,9 @@ import React, { memo } from 'react';
 import { Handle, Position, NodeResizer } from '@xyflow/react';
 import { Music, X, Play } from 'lucide-react';
 
-const MusicNode = ({ data, isConnectable, selected }) => {
+const MusicNode = ({ data, type, isConnectable, selected }) => {
+  const isPro = type === 'lyria_pro';
+
   return (
     <div className={`node-card ${data.status === 'running' ? 'running' : ''}`}>
       <NodeResizer
@@ -20,7 +22,7 @@ const MusicNode = ({ data, isConnectable, selected }) => {
       <div className="node-header blue">
         <div className="node-title">
           <Music size={16} color="#60a5fa" />
-          <span className="node-title-text">{data.label || 'Lyria Music'}</span>
+          <span className="node-title-text">{data.label || (isPro ? 'Lyria Pro' : 'Lyria Clip')}</span>
         </div>
         <div className="flex items-center gap-1">
           <button onClick={(e) => { e.stopPropagation(); data.onRunPartial?.(); }} className="delete-btn hover:text-green-400" title="Run Node & Descendants">
@@ -34,7 +36,7 @@ const MusicNode = ({ data, isConnectable, selected }) => {
 
       <div className="node-content overflow-y-auto flex-1">
         <div className="node-text-small text-gray-400 mb-2">
-          Input a prompt to generate music.
+          {isPro ? 'Text + image prompt to generate a full song.' : 'Text prompt to generate a 30s audio clip.'}
         </div>
         {data.value && (
           <div className="node-value-box">
@@ -53,6 +55,20 @@ const MusicNode = ({ data, isConnectable, selected }) => {
         />
         <span className="node-handle-label left">Prompt</span>
       </div>
+
+      {isPro && (
+        <div className="node-input-wrapper mt-2">
+          <Handle
+            type="target"
+            position={Position.Left}
+            id="image"
+            isConnectable={isConnectable}
+            className="node-handle input"
+            style={{ top: '70%' }}
+          />
+          <span className="node-handle-label left">Image</span>
+        </div>
+      )}
 
       <div className="node-output-wrapper mt-4">
         <Handle

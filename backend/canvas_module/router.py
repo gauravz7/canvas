@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends, Body
+from fastapi import APIRouter, HTTPException, Depends, Body, Query
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from database import get_db
-from models import Workflow as WorkflowModel
+from models import Workflow as WorkflowModel, TeamMember
+from auth import get_current_user, CurrentUser
 from .schemas import Workflow, ExecutionRequest, WorkflowExecutionResponse, NodeType, BatchExecutionRequest, BatchExecutionResponse
 from .engine import WorkflowEngine
 import json
@@ -17,6 +18,8 @@ class WorkflowSummary(BaseModel):
     id: str
     name: str
     updated_at: Optional[datetime] = None
+    visibility: Optional[str] = None
+    creator_name: Optional[str] = None
 
 class WorkflowListResponse(BaseModel):
     workflows: List[WorkflowSummary]
@@ -25,12 +28,13 @@ router = APIRouter()
 engine = WorkflowEngine()
 
 @router.post("/execute/stream")
-async def stream_execute_workflow(request: ExecutionRequest, db: Session = Depends(get_db)):
+async def stream_execute_workflow(request: ExecutionRequest, current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
     return StreamingResponse(
         engine.stream_workflow_execution(
-            request.workflow, 
-            request.node_ids, 
-            db=db, 
+            request.workflow,
+            request.node_ids,
+            user_id=current_user.uid,
+            db=db,
             use_cache=request.use_cache,
             execution_id=request.execution_id
         ),
@@ -46,9 +50,9 @@ async def cancel_workflow(execution_id: str):
         raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found or already finished")
 
 @router.post("/execute", response_model=WorkflowExecutionResponse)
-async def execute_workflow(request: ExecutionRequest, db: Session = Depends(get_db)):
+async def execute_workflow(request: ExecutionRequest, current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
-        results = await engine.execute_workflow(request.workflow, request.node_ids, db=db, use_cache=request.use_cache)
+        results = await engine.execute_workflow(request.workflow, request.node_ids, user_id=current_user.uid, db=db, use_cache=request.use_cache)
         
         # Determine overall status
         status = "completed"
@@ -65,26 +69,40 @@ async def execute_workflow(request: ExecutionRequest, db: Session = Depends(get_
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/save")
-async def save_workflow(workflow: Workflow, user_id: str = "default_user", db: Session = Depends(get_db)):
+async def save_workflow(
+    workflow: Workflow,
+    current_user: CurrentUser = Depends(get_current_user),
+    visibility: str = Query("private"),
+    team_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
     try:
         # Check if exists
         db_workflow = db.query(WorkflowModel).filter(WorkflowModel.id == workflow.id).first()
-        
+
         workflow_data = workflow.model_dump() # Pydantic v2
-        
+
         if db_workflow:
             db_workflow.name = workflow.name
             db_workflow.data = workflow_data
+            db_workflow.visibility = visibility
+            db_workflow.team_id = team_id
+            db_workflow.creator_name = current_user.name
+            db_workflow.creator_email = current_user.email
             # SQLAlchemy handles JSON type and updated_at (onupdate)
         else:
             db_workflow = WorkflowModel(
                 id=workflow.id,
                 name=workflow.name,
                 data=workflow_data,
-                user_id=user_id
+                user_id=current_user.uid,
+                visibility=visibility,
+                team_id=team_id,
+                creator_name=current_user.name,
+                creator_email=current_user.email
             )
             db.add(db_workflow)
-            
+
         db.commit()
         return {"status": "success", "id": workflow.id}
     except Exception as e:
@@ -92,29 +110,75 @@ async def save_workflow(workflow: Workflow, user_id: str = "default_user", db: S
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/list", response_model=WorkflowListResponse)
-async def list_workflows(user_id: str = "default_user", db: Session = Depends(get_db)):
+async def list_workflows(
+    current_user: CurrentUser = Depends(get_current_user),
+    filter: str = Query("mine"),
+    db: Session = Depends(get_db)
+):
     """
     List all saved workflows for the user.
+    filter: "mine" | "team" | "public"
     """
-    workflows = db.query(WorkflowModel).filter(WorkflowModel.user_id == user_id).order_by(WorkflowModel.updated_at.desc()).all()
-    
+    if filter == "team":
+        # Get user's team IDs
+        memberships = db.query(TeamMember).filter(TeamMember.user_id == current_user.uid).all()
+        team_ids = [m.team_id for m in memberships]
+        if team_ids:
+            workflows = db.query(WorkflowModel).filter(
+                WorkflowModel.team_id.in_(team_ids),
+                WorkflowModel.visibility == "team"
+            ).order_by(WorkflowModel.updated_at.desc()).all()
+        else:
+            workflows = []
+    elif filter == "public":
+        workflows = db.query(WorkflowModel).filter(
+            WorkflowModel.visibility == "public"
+        ).order_by(WorkflowModel.updated_at.desc()).all()
+    else:
+        # "mine" - default
+        workflows = db.query(WorkflowModel).filter(
+            WorkflowModel.user_id == current_user.uid
+        ).order_by(WorkflowModel.updated_at.desc()).all()
+
     return WorkflowListResponse(
         workflows=[
             WorkflowSummary(
                 id=wf.id,
                 name=wf.name,
-                updated_at=wf.updated_at
+                updated_at=wf.updated_at,
+                visibility=wf.visibility,
+                creator_name=wf.creator_name
             ) for wf in workflows
         ]
     )
 @router.get("/{workflow_id}", response_model=Dict[str, Any])
-async def get_workflow(workflow_id: str, db: Session = Depends(get_db)):
+async def get_workflow(workflow_id: str, current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Get a specific workflow by ID.
     """
     db_workflow = db.query(WorkflowModel).filter(WorkflowModel.id == workflow_id).first()
     if not db_workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")
+
+    # Access control
+    visibility = getattr(db_workflow, 'visibility', 'private') or 'private'
+    if visibility == "private":
+        if db_workflow.user_id != current_user.uid:
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif visibility == "team":
+        team_id = getattr(db_workflow, 'team_id', None)
+        if db_workflow.user_id != current_user.uid:
+            if team_id:
+                membership = db.query(TeamMember).filter(
+                    TeamMember.team_id == team_id,
+                    TeamMember.user_id == current_user.uid
+                ).first()
+                if not membership:
+                    raise HTTPException(status_code=403, detail="Access denied")
+            else:
+                raise HTTPException(status_code=403, detail="Access denied")
+    # "public" visibility allows all authenticated users
+
     return db_workflow.data
 
 
@@ -127,38 +191,24 @@ async def get_example_workflows():
 
 
 @router.post("/import")
-async def import_workflow(workflow: Workflow, user_id: str = Body("default_user"), db: Session = Depends(get_db)):
+async def import_workflow(workflow: Workflow, current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
     """
-    Imports a workflow from JSON. 
+    Imports a workflow from JSON.
     Ideally the frontend sends the JSON, we validate it against `Workflow` schema (done by FastAPI automatically),
     and then save it as a new workflow (or update if ID matches and user confirms? For now, we save).
     """
-    # If we want to force a NEW ID for import to avoid collisions, we could do it here.
-    # But usually import keeps ID or generates new one. 
-    # Let's generate a new ID to be safe if it conflicts? 
-    # Or just upsert.
-    # User request: "import and export as a json". 
-    # Usually import implies "Loading" into the canvas. 
-    # But we can also save it to DB.
-    
-    # We will just return the valid workflow structure to be used by Frontend?
-    # Or save it? "Validates and saves imported JSON" was the plan.
-    
     # Check if ID exists
     exists = db.query(WorkflowModel).filter(WorkflowModel.id == workflow.id).first()
     if exists:
-        # If it exists, maybe we just update it?
-        # Or we generate a new ID?
-        # Let's just upsert.
         pass
-        
-    return await save_workflow(workflow, user_id, db)
+
+    return await save_workflow(workflow, current_user=current_user, db=db)
 
 @router.post("/{workflow_id}/batch", response_model=BatchExecutionResponse)
 async def batch_execute_workflow(
-    workflow_id: str, 
-    request: BatchExecutionRequest, 
-    user_id: str = "default_user",
+    workflow_id: str,
+    request: BatchExecutionRequest,
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -190,7 +240,7 @@ async def batch_execute_workflow(
         # Execute
         # We run the whole workflow (node_ids=None)
         try:
-            results = await engine.execute_workflow(workflow, user_id=user_id, db=db)
+            results = await engine.execute_workflow(workflow, user_id=current_user.uid, db=db)
             
             # Extract Output
             output_nodes = [n for n in workflow.nodes if n.type == NodeType.OUTPUT]

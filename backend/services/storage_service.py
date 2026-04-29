@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import uuid
 import base64
@@ -21,22 +22,24 @@ class StorageService:
         self.assets_dir = os.path.join(self.base_dir, "data", "assets")
         os.makedirs(self.assets_dir, exist_ok=True)
 
-    def save_asset(self, 
-                   user_id: str, 
-                   content: Union[bytes, str], 
-                   asset_type: str, 
-                   mime_type: str, 
-                   prompt: str, 
+    def _sanitize_path_component(self, value: str) -> str:
+        sanitized = re.sub(r'[^a-zA-Z0-9_\-.]', '_', value)
+        if not sanitized or sanitized in ('.', '..'):
+            sanitized = 'invalid'
+        return sanitized
+
+    def save_asset(self,
+                   user_id: str,
+                   content: Union[bytes, str],
+                   asset_type: str,
+                   mime_type: str,
+                   prompt: str,
                    model_id: str,
                    meta_data: dict = None) -> Asset:
-        """
-        Save asset to disk and database.
-        content: can be bytes or a base64 string or a GCS URI (though GCS URI we might just store as reference)
-        """
         db = SessionLocal()
         try:
-            # 1. Prepare File Path
-            # Structure: assets/{user_id}/{asset_type}/timestamp_uuid.ext
+            user_id = self._sanitize_path_component(user_id)
+            asset_type = self._sanitize_path_component(asset_type)
             user_dir = os.path.join(self.assets_dir, user_id, asset_type)
             os.makedirs(user_dir, exist_ok=True)
 
@@ -95,6 +98,7 @@ class StorageService:
             db.close()
 
     def get_history(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Asset]:
+        user_id = self._sanitize_path_component(user_id)
         db = SessionLocal()
         try:
             return db.query(Asset).filter(Asset.user_id == user_id).order_by(Asset.created_at.desc()).offset(offset).limit(limit).all()
@@ -102,22 +106,18 @@ class StorageService:
             db.close()
 
     def download_gcs_blob(self, gcs_uri: str, user_id: str) -> Optional[str]:
-        """
-        Downloads a GCS blob to local storage and returns the relative path.
-        Used to proxy GCS videos for reliable frontend playback.
-        """
         try:
             if not gcs_uri.startswith("gs://"):
                 return None
-                
+
+            user_id = self._sanitize_path_component(user_id)
             bucket_name = gcs_uri.split("/")[2]
             blob_name = "/".join(gcs_uri.split("/")[3:])
-            
-            # Use default client (picks up GOOGLE_APPLICATION_CREDENTIALS)
+
             client = storage.Client()
             bucket = client.bucket(bucket_name)
             blob = bucket.blob(blob_name)
-            
+
             user_video_dir = os.path.join(self.assets_dir, user_id, "video")
             os.makedirs(user_video_dir, exist_ok=True)
             

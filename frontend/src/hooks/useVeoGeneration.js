@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiFetch } from '../utils/api';
 
 export const useVeoGeneration = (userId, config) => {
   const [activeMode, setActiveMode] = useState('standard'); // standard, extension, subject
@@ -53,7 +54,7 @@ export const useVeoGeneration = (userId, config) => {
     }
 
     try {
-      const response = await fetch('/api/generate/video', {
+      const response = await apiFetch('/api/generate/video', {
         method: 'POST',
         body: formData,
       });

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { apiFetch } from '../../utils/api';
 import { ReactFlow, Background, useNodesState, useEdgesState, addEdge, useReactFlow } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import './Canvas.css';
@@ -11,6 +12,7 @@ import SpeechNode from './nodes/SpeechNode';
 import VeoNode from './nodes/VeoNode';
 import MusicNode from './nodes/MusicNode';
 import EditorNode from './nodes/EditorNode';
+import VideoUpscaleNode from './nodes/VideoUpscaleNode';
 import Toolbar from './Toolbar';
 import { Plus, Minus, Maximize, ZoomIn, ZoomOut } from 'lucide-react';
 
@@ -42,24 +44,30 @@ const nodeTypes = {
   imagen_upscale: UpscaleNode,
   speech_gen: SpeechNode,
   lyria_gen: MusicNode,
+  lyria_clip: MusicNode,
+  lyria_pro: MusicNode,
   veo_standard: VeoNode,
   veo_extend: VeoNode,
   veo_reference: VeoNode,
+  veo_upscale: VideoUpscaleNode,
   editor: EditorNode,
 };
 
-const CanvasPage = ({ userId = 'default_user' }) => {
+const CanvasPage = ({ userId = 'default_user', initialData, onStateChange }) => {
   React.useEffect(() => {
     console.log("CanvasPage mounted - nodeTypes:", Object.keys(nodeTypes));
   }, []);
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialData?.nodes || []);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialData?.edges || []);
   const [isRunning, setIsRunning] = useState(false);
   const [useCache, setUseCache] = useState(false);
   const [currentExecutionId, setCurrentExecutionId] = useState(null);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
-  const [workflowId, setWorkflowId] = useState(uuidv4());
-  const [workflowName, setWorkflowName] = useState('Untitled Workflow');
+  const [workflowId, setWorkflowId] = useState(initialData?.id || uuidv4());
+  const [workflowName, setWorkflowName] = useState(initialData?.name || 'Untitled Workflow');
+  const [visibility, setVisibility] = useState('private');
+  const [selectedTeamId, setSelectedTeamId] = useState('');
+  const [userTeams, setUserTeams] = useState([]);
   const reactFlowWrapper = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -70,6 +78,18 @@ const CanvasPage = ({ userId = 'default_user' }) => {
   // Update refs on render
   edgesRef.current = edges;
   nodesRef.current = nodes;
+
+  // Report state changes back to parent for tab preservation
+  React.useEffect(() => {
+    if (onStateChange) {
+      onStateChange({ id: workflowId, name: workflowName, nodes, edges });
+    }
+  }, [nodes, edges, workflowName, workflowId]);
+
+  // Fetch user teams for visibility selector
+  React.useEffect(() => {
+    apiFetch('/api/teams/mine').then(r => r.ok ? r.json() : []).then(setUserTeams).catch(() => {});
+  }, []);
 
   // Load Sample Workflow on Mount if empty or check for pending load
   React.useEffect(() => {
@@ -95,7 +115,7 @@ const CanvasPage = ({ userId = 'default_user' }) => {
       }
     }
 
-    if (nodes.length === 0) {
+    if (nodes.length === 0 && !initialData?.nodes?.length) {
       // Sample Workflow
       const sampleNodes = [
         { id: '1', type: 'gemini_text', position: { x: 100, y: 100 }, data: { label: 'Start Idea', value: 'Explain quantum computing in 5 words' } },
@@ -184,8 +204,11 @@ const CanvasPage = ({ userId = 'default_user' }) => {
         else label = 'Text Output';
       }
       else if (type === 'imagen_upscale') label = 'Image Upscaler';
+      else if (type === 'veo_upscale') label = 'Video Upscale';
       else if (type === 'speech_gen') label = 'Speech Gen';
-      else if (type === 'lyria_gen') label = 'Lyria Music';
+      else if (type === 'lyria_gen') label = 'Lyria Clip';
+      else if (type === 'lyria_clip') label = 'Lyria Clip';
+      else if (type === 'lyria_pro') label = 'Lyria Pro';
       else if (type === 'veo_standard') label = 'Veo Standard';
       else if (type === 'veo_extend') label = 'Veo Extend';
       else if (type === 'veo_reference') label = 'Veo Reference';
@@ -254,8 +277,11 @@ const CanvasPage = ({ userId = 'default_user' }) => {
       else label = 'Text Output';
     }
     else if (type === 'imagen_upscale') label = 'Image Upscaler';
+    else if (type === 'veo_upscale') label = 'Video Upscale';
     else if (type === 'speech_gen') label = 'Speech Gen';
-    else if (type === 'lyria_gen') label = 'Lyria Music';
+    else if (type === 'lyria_gen') label = 'Lyria Clip';
+    else if (type === 'lyria_clip') label = 'Lyria Clip';
+    else if (type === 'lyria_pro') label = 'Lyria Pro';
     else if (type === 'veo_standard') label = 'Veo Standard';
     else if (type === 'veo_extend') label = 'Veo Extend';
     else if (type === 'veo_reference') label = 'Veo Reference';
@@ -355,7 +381,7 @@ const CanvasPage = ({ userId = 'default_user' }) => {
 
     try {
       // Use proxy or full URL
-      const response = await fetch('/api/workflow/execute/stream', {
+      const response = await apiFetch('/api/workflow/execute/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -435,6 +461,21 @@ const CanvasPage = ({ userId = 'default_user' }) => {
                 )
               );
               if (isCache) console.log(`Node ${data.node_id} used cache`);
+            } else if (data.type === 'node_skipped') {
+              setNodes((nds) =>
+                nds.map((n) =>
+                  n.id === data.node_id
+                    ? {
+                      ...n,
+                      data: {
+                        ...n.data,
+                        status: 'skipped',
+                        executionResult: { output: null, error: data.reason || 'Skipped: upstream node failed' },
+                      },
+                    }
+                    : n
+                )
+              );
             } else if (data.type === 'workflow_completed' || data.type === 'execution_cancelled') {
               setIsRunning(false);
               setCurrentExecutionId(null);
@@ -455,7 +496,7 @@ const CanvasPage = ({ userId = 'default_user' }) => {
   const handleKill = async () => {
     if (!currentExecutionId) return;
     try {
-      const response = await fetch(`/api/workflow/execute/cancel/${currentExecutionId}`, {
+      const response = await apiFetch(`/api/workflow/execute/cancel/${currentExecutionId}`, {
         method: 'POST'
       });
       if (!response.ok) {
@@ -475,7 +516,8 @@ const CanvasPage = ({ userId = 'default_user' }) => {
         id: workflowId,
         name: workflowName
       };
-      const response = await fetch(`/api/workflow/save?user_id=${userId}`, {
+      const saveParams = `?visibility=${visibility}${visibility === 'team' && selectedTeamId ? '&team_id=' + selectedTeamId : ''}`;
+      const response = await apiFetch(`/api/workflow/save${saveParams}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -614,6 +656,11 @@ const CanvasPage = ({ userId = 'default_user' }) => {
           setUseCache={setUseCache}
           workflowName={workflowName}
           setWorkflowName={setWorkflowName}
+          visibility={visibility}
+          setVisibility={setVisibility}
+          selectedTeamId={selectedTeamId}
+          setSelectedTeamId={setSelectedTeamId}
+          teams={userTeams}
         />
       </div>
 

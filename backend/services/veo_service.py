@@ -278,5 +278,133 @@ class VeoService:
             "rai_filtered_count": result.rai_media_filtered_count if result else 0
         }
 
+    async def upscale_video(
+        self,
+        video_gcs_uri: str,
+        config_params: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
+        config_params = config_params or {}
+        output_uri = f"gs://{model_config.VEO_BUCKET}/veo_upscale/{uuid.uuid4()}/"
+
+        import google.auth
+        import google.auth.transport.requests
+        import httpx
+
+        creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+        auth_req = google.auth.transport.requests.Request()
+        if not creds.valid:
+            creds.refresh(auth_req)
+
+        endpoint = (
+            f"https://{self.location}-aiplatform.googleapis.com/v1/"
+            f"projects/{self.project_id}/locations/{self.location}/"
+            f"publishers/google/models/veo-3.1-generate-001:predictLongRunning"
+        )
+
+        payload = {
+            "instances": [{
+                "video": {
+                    "gcsUri": video_gcs_uri,
+                    "mimeType": "video/mp4"
+                }
+            }],
+            "parameters": {
+                "task": "upscale",
+                "resolution": config_params.get("resolution", "4k"),
+                "aspectRatio": config_params.get("aspect_ratio", "16:9"),
+                "compressionQuality": config_params.get("compression_quality", "optimized"),
+                "storageUri": output_uri,
+                "sharpness": config_params.get("sharpness", 1)
+            }
+        }
+
+        headers = {
+            "Authorization": f"Bearer {creds.token}",
+            "Content-Type": "application/json"
+        }
+
+        log_service.info(f"Video upscale request: {video_gcs_uri} -> {output_uri}", "VeoService")
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(endpoint, json=payload, headers=headers, timeout=120.0)
+            if response.status_code != 200:
+                raise Exception(f"Video Upscale API Error {response.status_code}: {response.text}")
+            op_data = response.json()
+
+        op_name = op_data.get("name")
+        if not op_name:
+            raise Exception(f"No operation name in upscale response: {op_data}")
+
+        log_service.info(f"Upscale operation started: {op_name}", "VeoService")
+
+        poll_endpoint = f"https://{self.location}-aiplatform.googleapis.com/v1/{op_name}"
+
+        poll_data = {}
+        max_polls = 60
+        for poll_count in range(max_polls):
+            await asyncio.sleep(20)
+            if not creds.valid:
+                creds.refresh(auth_req)
+            poll_headers = {"Authorization": f"Bearer {creds.token}"}
+
+            try:
+                async with httpx.AsyncClient() as client:
+                    poll_resp = await client.get(poll_endpoint, headers=poll_headers, timeout=60.0)
+
+                if poll_resp.status_code != 200:
+                    log_service.warning(f"Upscale poll HTTP {poll_resp.status_code}: {poll_resp.text[:200]}", "VeoService")
+                    continue
+
+                resp_text = poll_resp.text.strip()
+                if not resp_text:
+                    log_service.warning(f"Upscale poll returned empty response", "VeoService")
+                    continue
+
+                poll_data = poll_resp.json()
+            except Exception as e:
+                log_service.warning(f"Upscale poll error (retrying): {e}", "VeoService")
+                continue
+
+            if poll_data.get("done"):
+                log_service.info(f"Upscale complete after {poll_count + 1} polls: {op_name}", "VeoService")
+                break
+
+            log_service.info(f"Upscale polling #{poll_count + 1}: {op_name} done={poll_data.get('done', False)}", "VeoService")
+        else:
+            raise Exception(f"Video upscale timed out after {max_polls} polls")
+
+        if "error" in poll_data:
+            raise Exception(f"Video upscale failed: {poll_data['error']}")
+
+        response_data = poll_data.get("response", poll_data.get("metadata", {}))
+        videos = []
+
+        if "videos" in response_data:
+            for vid in response_data["videos"]:
+                video_entry = {"mime_type": "video/mp4"}
+                if isinstance(vid, dict):
+                    video_entry["uri"] = vid.get("gcsUri") or vid.get("uri", "")
+                elif isinstance(vid, str):
+                    video_entry["uri"] = vid
+                videos.append(video_entry)
+
+        if not videos:
+            from google.cloud import storage as gcs_storage
+            try:
+                bucket_name = output_uri.replace("gs://", "").split("/")[0]
+                prefix = "/".join(output_uri.replace("gs://", "").split("/")[1:])
+                client = gcs_storage.Client()
+                bucket = client.bucket(bucket_name)
+                blobs = list(bucket.list_blobs(prefix=prefix))
+                for blob in blobs:
+                    if blob.name.endswith(('.mp4', '.webm')):
+                        videos.append({"uri": f"gs://{bucket_name}/{blob.name}", "mime_type": "video/mp4"})
+                log_service.info(f"Found {len(videos)} upscaled videos in {output_uri}", "VeoService")
+            except Exception as e:
+                log_service.error(f"Failed to list upscaled videos: {e}", "VeoService")
+                videos = [{"uri": output_uri, "mime_type": "video/mp4"}]
+
+        return {"videos": videos, "output_uri": output_uri}
+
 # Initialize singleton
 veo_service = VeoService(project_id=settings.PROJECT_ID)

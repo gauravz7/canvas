@@ -1,4 +1,7 @@
 import asyncio
+import time
+import os
+from collections import OrderedDict
 from typing import Dict, Any, List, Set, Union, Optional
 from .schemas import Workflow, Node, NodeType, ExecutionResult
 from services.gemini_service import gemini_service
@@ -19,22 +22,34 @@ from .executors.editor_executor import EditorExecutor
 
 class ExecutionCache:
     _instance = None
-    _cache = {} # Dict[str, Any] where key is hash(node_id + inputs_hash + config_hash)
+    MAX_SIZE = 100
+    TTL_SECONDS = 1800
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(ExecutionCache, cls).__new__(cls)
-            cls._instance._cache = {}
+            cls._instance._cache = OrderedDict()
         return cls._instance
 
     def get(self, key: str) -> Any:
-        return self._cache.get(key)
+        if key not in self._cache:
+            return None
+        value, timestamp = self._cache[key]
+        if time.time() - timestamp > self.TTL_SECONDS:
+            del self._cache[key]
+            return None
+        self._cache.move_to_end(key)
+        return value
 
     def set(self, key: str, value: Any):
-        self._cache[key] = value
+        if key in self._cache:
+            self._cache.move_to_end(key)
+        self._cache[key] = (value, time.time())
+        while len(self._cache) > self.MAX_SIZE:
+            self._cache.popitem(last=False)
 
     def clear(self):
-        self._cache = {}
+        self._cache = OrderedDict()
 
 
 logger = logging.getLogger(__name__)
@@ -133,20 +148,22 @@ class WorkflowEngine:
         
         # 3. Handle dictionaries
         if isinstance(val, dict):
-            # Check for direct "data" key
             if "data" in val:
                 try:
                     data = val["data"]
                     return base64.b64decode(data) if isinstance(data, str) else data
                 except Exception as e:
                     logger.warning(f"Failed to extract direct data from dict: {e}")
-            
-            # Check for lists: "images", "videos", "audio"
+
+            if "url" in val and not "data" in val:
+                file_bytes = self._resolve_url_to_bytes(val["url"])
+                if file_bytes:
+                    return file_bytes
+
             for key in ["images", "videos", "audio"]:
                 if key in val and isinstance(val[key], list) and val[key]:
-                    # Recurse on the first item
                     return self._extract_media_bytes(val[key][0])
-                    
+
         return None
 
     def _extract_media_info(self, val: Any) -> Dict[str, Any]:
@@ -161,14 +178,12 @@ class WorkflowEngine:
                 bytes_data = base64.b64decode(data) if isinstance(data, str) else data
                 return {"data": bytes_data, "mime_type": val.get("mime_type")}
             
-            # Check for direct uri/url if no data
             if "uri" in val:
                 return {"data": val["uri"], "mime_type": val.get("mime_type")}
             if "url" in val:
-                # If it's a local proxy URL, we might want to return the storage_path if we can, 
-                # but veo_service is better with gs:// or local bytes.
-                # However, if we only have the URL, it might be better than nothing.
-                pass
+                file_bytes = self._resolve_url_to_bytes(val["url"])
+                if file_bytes:
+                    return {"data": file_bytes, "mime_type": val.get("mime_type")}
 
             # Recurse for nested "images", "videos", "audio" lists or dicts
             for key in ["images", "videos", "audio"]:
@@ -225,24 +240,27 @@ class WorkflowEngine:
                 nodes_to_run = self._topological_sort(workflow.nodes, deps)
 
             # 3. Execute Nodes
+            skipped_nodes: Set[str] = set()
+
             for node in nodes_to_run:
+                if node.id in skipped_nodes:
+                    yield f"data: {json.dumps({'type': 'node_skipped', 'node_id': node.id, 'reason': 'Upstream node failed'})}\n\n"
+                    continue
+
                 try:
-                    # Signal node start
                     yield f"data: {json.dumps({'type': 'node_started', 'node_id': node.id})}\n\n"
-                    
-                    # Resolve Inputs
+
                     inputs = self._resolve_inputs(node, workflow.edges, context)
-                    
-                    # Execute Node Logic
+
                     output = await self._execute_node(node, inputs, user_id, db, context=context, use_cache=use_cache)
-                    
-                    # Store Output
+
+                    output = self._strip_base64_from_output(output)
+
                     context[node.id] = output
-                    
-                    # Signal node completion
+
                     res = ExecutionResult(node_id=node.id, status="completed", output=output)
                     yield f"data: {json.dumps({'type': 'node_completed', 'node_id': node.id, 'result': res.model_dump()})}\n\n"
-                    
+
                 except asyncio.CancelledError:
                     logger.info(f"[KILL] Execution {execution_id} was cancelled during node {node.id}.")
                     yield f"data: {json.dumps({'type': 'execution_cancelled', 'execution_id': execution_id})}\n\n"
@@ -251,6 +269,8 @@ class WorkflowEngine:
                     logger.error(f"Error executing node {node.id}: {e}")
                     res = ExecutionResult(node_id=node.id, status="failed", output=None, error=str(e))
                     yield f"data: {json.dumps({'type': 'node_failed', 'node_id': node.id, 'result': res.model_dump()})}\n\n"
+                    downstream = self._get_downstream_closure(node.id, workflow.edges)
+                    skipped_nodes.update(downstream)
             
             yield f"data: {json.dumps({'type': 'workflow_completed'})}\n\n"
         finally:
@@ -380,6 +400,53 @@ class WorkflowEngine:
             return nodes
             
         return sorted_nodes
+
+    def _get_downstream_closure(self, failed_node_id: str, edges) -> Set[str]:
+        downstream = set()
+        queue = [failed_node_id]
+        while queue:
+            current = queue.pop(0)
+            for edge in edges:
+                if edge.source == current and edge.target not in downstream:
+                    downstream.add(edge.target)
+                    queue.append(edge.target)
+        return downstream
+
+    def _resolve_url_to_bytes(self, url: str) -> Optional[bytes]:
+        if not url or not url.startswith("/api/media/"):
+            return None
+        relative_path = url[len("/api/media/"):]
+        file_path = os.path.realpath(os.path.join(storage_service.assets_dir, relative_path))
+        if not file_path.startswith(os.path.realpath(storage_service.assets_dir)):
+            return None
+        if os.path.isfile(file_path):
+            with open(file_path, "rb") as f:
+                return f.read()
+        return None
+
+    def _strip_base64_from_output(self, output: Any) -> Any:
+        if output is None or isinstance(output, str):
+            return output
+
+        if isinstance(output, dict):
+            for key in ("images", "videos"):
+                if key in output and isinstance(output[key], list):
+                    for item in output[key]:
+                        if isinstance(item, dict) and "storage_path" in item:
+                            sp = item["storage_path"]
+                            if sp and not sp.startswith("gs://") and "url" not in item:
+                                item["url"] = f"/api/media/{sp}"
+                            item.pop("data", None)
+
+            if "audio" in output and isinstance(output["audio"], dict):
+                aud = output["audio"]
+                if "storage_path" in aud:
+                    sp = aud["storage_path"]
+                    if sp and not sp.startswith("gs://") and "url" not in aud:
+                        aud["url"] = f"/api/media/{sp}"
+                    aud.pop("data", None)
+
+        return output
 
     def _flatten(self, val: Any) -> List[Any]:
         """Recursively flattens a list of inputs."""
@@ -656,25 +723,33 @@ class WorkflowEngine:
                 return {"error": "No text input for speech generation"}
             
             config = node.data.config or {}
-            # Robust fallback for model_id and voice_name
-            model_id = config.get("model_id") or "gemini-2.5-flash-tts"
+            model_id = config.get("model_id") or "gemini-3.1-flash-tts-preview"
             voice_name = config.get("voice_name") or "Kore"
-            
-            # Construct payload for Journey/Gemini voices
+            language = config.get("language") or "en"
+            system_instruction = config.get("system_instruction") or ""
+
+            language_code = f"{language}-{language.upper()}" if len(language) == 2 else language
+            if language == "en":
+                language_code = "en-US"
+            elif language == "zh":
+                language_code = "cmn-CN"
+
+            if system_instruction:
+                prompt = f"[System: {system_instruction}]\n\n{prompt}"
+
             payload = {
                 "input": {"text": prompt},
                 "voice": {
-                    "languageCode": "en-US",
+                    "languageCode": language_code,
                     "name": voice_name,
                     "model_name": model_id
                 },
                 "audioConfig": {"audioEncoding": "LINEAR16"}
             }
-            # Remove model_name if None (sanity check)
             if not payload["voice"]["model_name"]:
                 del payload["voice"]["model_name"]
-            
-            logger.info(f"[TTS] Generating speech with voice={voice_name}, model={model_id}")
+
+            logger.info(f"[TTS] Generating speech with voice={voice_name}, model={model_id}, lang={language_code}")
 
             # Call VertexService
             b64_audio = await vertex_service.synthesize_raw(payload)
@@ -701,20 +776,30 @@ class WorkflowEngine:
                 }
             }
 
-        # 5. LYRIA GEN Node
-        if node.type == NodeType.LYRIA_GEN:
+        # 5. LYRIA Nodes (GEN=legacy, CLIP=text→audio, PRO=text+image→audio)
+        if node.type in [NodeType.LYRIA_GEN, NodeType.LYRIA_CLIP, NodeType.LYRIA_PRO]:
             text_inputs = inputs.get("text", []) or inputs.get("input", [])
             prompt = text_inputs[0] if text_inputs else node.data.value or ""
-            
+
             if not prompt:
                 return {"error": "No prompt for music generation"}
-            
-            # Call VertexService
-            result = await vertex_service.generate_music(prompt=prompt)
+
+            config = node.data.config or {}
+
+            if node.type == NodeType.LYRIA_PRO:
+                model_id = config.get("model_id") or "lyria-3-pro-preview"
+                image_data = None
+                image_inputs = inputs.get("image", [])
+                if image_inputs:
+                    image_data = self._extract_media_bytes(image_inputs[0])
+                result = await vertex_service.generate_music(prompt=prompt, model_id=model_id, image_data=image_data)
+            else:
+                model_id = config.get("model_id") or "lyria-3-clip-preview"
+                result = await vertex_service.generate_music(prompt=prompt, model_id=model_id)
+
             b64_audio = result.get("audioContent")
             audio_content = base64.b64decode(b64_audio)
-            
-            # Save to storage
+
             asset = await asyncio.to_thread(
                 storage_service.save_asset,
                 user_id=user_id,
@@ -722,9 +807,9 @@ class WorkflowEngine:
                 asset_type="audio",
                 mime_type="audio/mp3",
                 prompt=prompt[:100],
-                model_id="lyria-002"
+                model_id=model_id
             )
-            
+
             return {
                 "audio": {
                     "data": b64_audio,
@@ -812,12 +897,12 @@ class WorkflowEngine:
                         
                         if local_rel_path:
                             # Set the proxy URL for the frontend
-                            # The frontend expects /data/assets/... but storage_service returns user_id/...
+                            # The frontend expects /api/media/... but storage_service returns user_id/...
                             # Wait, storage_service and engine.py have different expectations of relative path.
                             # In storage_service.save_asset, relative_path is user_id/asset_type/filename.
                             # The FastAPI server mounts /data to the 'data' directory.
-                            # So the full path is /data/assets/{user_id}/{type}/{filename}
-                            video["url"] = f"/data/assets/{local_rel_path}"
+                            # So the full path is /api/media/{user_id}/{type}/{filename}
+                            video["url"] = f"/api/media/{local_rel_path}"
                             logger.info(f"Local proxy URL for video: {video['url']}")
                         else:
                             # Fallback to signed URL if download fails
@@ -829,6 +914,51 @@ class WorkflowEngine:
                         if "storage_path" not in video:
                             video["storage_path"] = video["uri"]
             
+            return response
+
+        # 6b. VEO UPSCALE Node
+        if node.type == NodeType.VEO_UPSCALE:
+            video_inputs = inputs.get("video", []) or inputs.get("input", [])
+            if not video_inputs:
+                return {"error": "No video input for upscale"}
+
+            config = node.data.config or {}
+
+            video_val = video_inputs[0]
+            gcs_uri = None
+            if isinstance(video_val, str) and video_val.startswith("gs://"):
+                gcs_uri = video_val
+            elif isinstance(video_val, dict):
+                gcs_uri = video_val.get("uri") or video_val.get("gcs_uri")
+                if not gcs_uri and "videos" in video_val:
+                    for v in video_val["videos"]:
+                        if isinstance(v, dict) and v.get("uri"):
+                            gcs_uri = v["uri"]
+                            break
+
+            if not gcs_uri or not gcs_uri.startswith("gs://"):
+                return {"error": "Video upscale requires a GCS URI. Connect a Veo output node."}
+
+            response = await veo_service.upscale_video(
+                video_gcs_uri=gcs_uri,
+                config_params={
+                    "resolution": config.get("resolution", "4k"),
+                    "aspect_ratio": config.get("aspect_ratio", "16:9"),
+                    "sharpness": config.get("sharpness", 1),
+                    "compression_quality": config.get("compression_quality", "optimized"),
+                }
+            )
+
+            for video in response.get("videos", []):
+                if video.get("uri") and video["uri"].startswith("gs://"):
+                    local_rel_path = await asyncio.to_thread(
+                        storage_service.download_gcs_blob,
+                        gcs_uri=video["uri"],
+                        user_id=user_id
+                    )
+                    if local_rel_path:
+                        video["url"] = f"/api/media/{local_rel_path}"
+
             return response
 
         # 7. OUTPUT Node

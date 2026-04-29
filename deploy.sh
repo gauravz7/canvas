@@ -3,8 +3,7 @@ set -e
 
 SERVICE_NAME="vibe-studio-refactor"
 REGION="us-central1"
-# Ensure PROJECT_ID is set, otherwise default to vital-octagon-19612
-PROJECT_ID=${GOOGLE_CLOUD_PROJECT:-"vital-octagon-19612"}
+PROJECT_ID=${GOOGLE_CLOUD_PROJECT:?"Error: GOOGLE_CLOUD_PROJECT env var must be set"}
 
 echo "🏗️ Building frontend..."
 cd frontend && npm run build
@@ -21,6 +20,6 @@ gcloud run deploy $SERVICE_NAME \
     --memory 2Gi \
     --cpu 1 \
     --timeout 3600 \
-    --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID"
+    --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID,FIREBASE_PROJECT_ID=$PROJECT_ID,CORS_ORIGINS=*"
 
 echo "✅ Deployment completed successfully!"

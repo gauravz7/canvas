@@ -266,7 +266,7 @@ async def generate_video(
                         user_id=user_id
                     )
                     if local_rel_path:
-                        vid["url"] = f"/data/assets/{local_rel_path}"
+                        vid["url"] = f"/api/media/{local_rel_path}"
                     else:
                         signed_url = vertex_service.get_signed_url(vid["uri"])
                         if signed_url:

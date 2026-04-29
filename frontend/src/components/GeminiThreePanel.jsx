@@ -2,11 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, X, Send, Cpu, Layers } from 'lucide-react';
 import { useConfig } from '../contexts/ConfigContext';
+import { apiFetch } from '../utils/api';
 
 const GeminiThreePanel = () => {
   const { config } = useConfig();
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState(config?.DEFAULT_GEMINI_TEXT_MODEL || "gemini-3-pro-preview");
+  const [model, setModel] = useState(config?.DEFAULT_GEMINI_TEXT_MODEL || "gemini-3.1-pro-preview");
 
   useEffect(() => {
     if (config?.DEFAULT_GEMINI_TEXT_MODEL) {
@@ -51,7 +52,7 @@ const GeminiThreePanel = () => {
         formData.append("files", file);
       });
 
-      const response = await fetch('/api/generate/content', {
+      const response = await apiFetch('/api/generate/content', {
         method: 'POST',
         body: formData,
       });
@@ -86,7 +87,7 @@ const GeminiThreePanel = () => {
               <option key={m} value={m}>{m}</option>
             )) || (
                 <>
-                  <option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
+                  <option value="gemini-3.1-pro-preview">Gemini 3 Pro Preview</option>
                   <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
                 </>
               )}

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { apiFetch } from '../utils/api';
 
 export const useWorkflowRun = () => {
   const [isRunning, setIsRunning] = useState(false);
@@ -27,7 +28,7 @@ export const useWorkflowRun = () => {
     );
 
     try {
-      const response = await fetch('/api/workflow/execute/stream', {
+      const response = await apiFetch('/api/workflow/execute/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

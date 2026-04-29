@@ -1,7 +1,7 @@
 import React from 'react';
 import { Bot, Image as ImageIcon, FileInput, Eye, Play, Save, Upload, Download, ArrowUpCircle, Volume2, Video, Workflow, Trash, Film } from 'lucide-react';
 
-const Toolbar = ({ onDragStart, onAddNode, onRun, onKill, onSave, onImport, onExport, isRunning, useCache, setUseCache, workflowName, setWorkflowName }) => {
+const Toolbar = ({ onDragStart, onAddNode, onRun, onKill, onSave, onImport, onExport, isRunning, useCache, setUseCache, workflowName, setWorkflowName, visibility, setVisibility, selectedTeamId, setSelectedTeamId, teams }) => {
   React.useEffect(() => {
     console.log("Toolbar mounted");
   }, []);
@@ -67,9 +67,13 @@ const Toolbar = ({ onDragStart, onAddNode, onRun, onKill, onSave, onImport, onEx
               <Bot size={14} color="#4ade80" />
               <span>Speech Gen</span>
             </div>
-            <div className="node-item sub" onDragStart={(event) => onDragStart(event, 'lyria_gen')} onClick={() => onAddNode('lyria_gen')} draggable>
+            <div className="node-item sub" onDragStart={(event) => onDragStart(event, 'lyria_clip')} onClick={() => onAddNode('lyria_clip')} draggable>
               <Bot size={14} color="#60a5fa" />
-              <span>Lyria Music</span>
+              <span>Lyria Clip</span>
+            </div>
+            <div className="node-item sub" onDragStart={(event) => onDragStart(event, 'lyria_pro')} onClick={() => onAddNode('lyria_pro')} draggable>
+              <Bot size={14} color="#818cf8" />
+              <span>Lyria Pro</span>
             </div>
           </div>
         </div>
@@ -136,6 +140,16 @@ const Toolbar = ({ onDragStart, onAddNode, onRun, onKill, onSave, onImport, onEx
 
         <div
           className="node-item"
+          onDragStart={(event) => onDragStart(event, 'veo_upscale')}
+          onClick={() => onAddNode('veo_upscale')}
+          draggable
+        >
+          <ArrowUpCircle size={16} className="text-orange-400" color="#fb923c" />
+          <span className="node-label">Video Upscaler</span>
+        </div>
+
+        <div
+          className="node-item"
           onDragStart={(event) => onDragStart(event, 'editor')}
           onClick={() => onAddNode('editor')}
           draggable
@@ -191,6 +205,34 @@ const Toolbar = ({ onDragStart, onAddNode, onRun, onKill, onSave, onImport, onEx
         )}
 
 
+
+        {/* Visibility selector */}
+        <div style={{ padding: '0 0.5rem', marginBottom: '0.25rem' }}>
+          <label style={{ display: 'block', fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem', marginLeft: '0.25rem' }}>
+            Visibility
+          </label>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            <select
+              value={visibility || 'private'}
+              onChange={(e) => { setVisibility(e.target.value); if (e.target.value !== 'team') setSelectedTeamId(''); }}
+              style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)', fontSize: '0.65rem', padding: '0.4rem', borderRadius: '0.375rem', cursor: 'pointer', flex: 1 }}
+            >
+              <option value="private">Private</option>
+              <option value="team">Team</option>
+              <option value="public">Public</option>
+            </select>
+            {visibility === 'team' && teams && teams.length > 0 && (
+              <select
+                value={selectedTeamId || ''}
+                onChange={(e) => setSelectedTeamId(e.target.value)}
+                style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)', fontSize: '0.65rem', padding: '0.4rem', borderRadius: '0.375rem', cursor: 'pointer', flex: 1 }}
+              >
+                <option value="">Select Team</option>
+                {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            )}
+          </div>
+        </div>
 
         <button onClick={onSave} className="toolbar-btn secondary">
           <Save size={16} color="#d1d5db" />

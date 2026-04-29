@@ -1,8 +1,10 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { Handle, Position, NodeResizer } from '@xyflow/react';
 import { Eye, Image as ImageIcon, X, Play, Download } from 'lucide-react';
 
 const OutputNode = ({ data, isConnectable, selected }) => {
+  const [videoErrors, setVideoErrors] = useState({});
+
   const renderContent = () => {
     try {
       if (!data.executionResult) {
@@ -18,6 +20,14 @@ const OutputNode = ({ data, isConnectable, selected }) => {
       const res = (executionResult && executionResult.output !== undefined)
         ? executionResult.output
         : executionResult;
+
+      if (data.status === 'skipped') {
+        return (
+          <div className="text-amber-500 text-[10px] p-2 bg-amber-900/20 rounded italic">
+            Skipped: upstream node failed
+          </div>
+        );
+      }
 
       if (!res) {
         return <div className="node-text-small text-gray-600 italic">No output received</div>;
@@ -99,11 +109,13 @@ const OutputNode = ({ data, isConnectable, selected }) => {
               <audio
                 controls
                 className="w-full h-8"
-                src={
-                  hasStandardAudio
-                    ? (processedRes.audio.url || (processedRes.audio.data?.startsWith?.('data:') ? processedRes.audio.data : `data:${processedRes.audio.mime_type};base64,${processedRes.audio.data}`))
-                    : (processedRes.url || (processedRes.data?.startsWith?.('data:') ? processedRes.data : `data:${processedRes.mime_type};base64,${processedRes.data}`))
-                }
+                src={(() => {
+                  const a = hasStandardAudio ? processedRes.audio : processedRes;
+                  if (a.url) return a.url;
+                  if (typeof a.data === 'string' && a.data.startsWith('data:')) return a.data;
+                  if (a.data) return `data:${a.mime_type};base64,${a.data}`;
+                  return '';
+                })()}
               />
             </div>
           )}
@@ -112,7 +124,7 @@ const OutputNode = ({ data, isConnectable, selected }) => {
           {hasImages && (
             <div className="flex flex-col gap-2">
               {processedRes.images.map((img, idx) => {
-                const src = (typeof img.data === 'string' && img.data?.startsWith?.('data:')) ? img.data : (img.data ? `data:${img.mime_type};base64,${img.data}` : '');
+                const src = img.url ? img.url : ((typeof img.data === 'string' && img.data?.startsWith?.('data:')) ? img.data : (img.data ? `data:${img.mime_type};base64,${img.data}` : ''));
                 return (
                   <div key={idx} className="relative group/image">
                     <img
@@ -186,12 +198,16 @@ const OutputNode = ({ data, isConnectable, selected }) => {
                       crossOrigin="anonymous"
                       className="w-full rounded bg-black aspect-video shadow-lg border border-orange-500/30"
                       src={vid.url ? vid.url : ((typeof vid.data === 'string' && vid.data?.startsWith?.('data:')) ? vid.data : (vid.data ? `data:${vid.mime_type};base64,${vid.data}` : ''))}
-                      onError={(e) => {
-                        console.error("Video load error:", e);
-                        const msg = vid.url ? `Failed to load video. This might be a missing file or CORS issue. URL: ${vid.url}` : "Failed to load video data.";
-                        e.target.insertAdjacentHTML('afterend', `<div class="text-[10px] text-red-500 mt-2 font-bold p-2 bg-red-900/10 rounded">${msg}</div>`);
+                      onError={() => {
+                        const msg = vid.url ? `Failed to load video. URL: ${vid.url}` : "Failed to load video data.";
+                        setVideoErrors(prev => ({ ...prev, [`vid-${idx}`]: msg }));
                       }}
                     />
+                    {videoErrors[`vid-${idx}`] && (
+                      <div className="text-[10px] text-red-500 mt-2 font-bold p-2 bg-red-900/10 rounded">
+                        {videoErrors[`vid-${idx}`]}
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (
@@ -222,12 +238,16 @@ const OutputNode = ({ data, isConnectable, selected }) => {
                     crossOrigin="anonymous"
                     className="w-full rounded bg-black aspect-video shadow-lg border border-orange-500/30"
                     src={processedRes.url ? processedRes.url : ((typeof processedRes.data === 'string' && processedRes.data?.startsWith?.('data:')) ? processedRes.data : (processedRes.data ? `data:${processedRes.mime_type};base64,${processedRes.data}` : ''))}
-                    onError={(e) => {
-                      console.error("Video load error:", e);
-                      const msg = processedRes.url ? `Failed to load video. This might be a missing file or CORS issue. URL: ${processedRes.url}` : "Failed to load video data.";
-                      e.target.insertAdjacentHTML('afterend', `<div class="text-[10px] text-red-500 mt-2 font-bold p-2 bg-red-900/10 rounded">${msg}</div>`);
+                    onError={() => {
+                      const msg = processedRes.url ? `Failed to load video. URL: ${processedRes.url}` : "Failed to load video data.";
+                      setVideoErrors(prev => ({ ...prev, ['direct']: msg }));
                     }}
                   />
+                  {videoErrors['direct'] && (
+                    <div className="text-[10px] text-red-500 mt-2 font-bold p-2 bg-red-900/10 rounded">
+                      {videoErrors['direct']}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

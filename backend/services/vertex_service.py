@@ -139,24 +139,29 @@ class VertexService:
             print(f"[ERROR] Failed to extract upscaled image. Prediction structure: {json.dumps(prediction, indent=2)}")
             raise Exception("Failed to extract upscaled image from Vertex AI response. Check logs for details.")
 
-    async def generate_music(self, prompt: str, negative_prompt: str = "", seed: int = 12345) -> Dict[str, Any]:
-        """Generates music using Lyria-002 model on Vertex AI."""
+    async def generate_music(self, prompt: str, negative_prompt: str = "", seed: int = 12345, model_id: str = "lyria-3-clip-preview", image_data: bytes = None) -> Dict[str, Any]:
         token = self._get_token()
         headers = {
             "Authorization": f"Bearer {token}",
             "x-goog-user-project": settings.PROJECT_ID,
             "Content-Type": "application/json; charset=utf-8"
         }
-        
-        endpoint = f"https://{settings.REGION}-aiplatform.googleapis.com/v1/projects/{settings.PROJECT_ID}/locations/{settings.REGION}/publishers/google/models/lyria-002:predict"
-        
+
+        endpoint = f"https://{settings.REGION}-aiplatform.googleapis.com/v1/projects/{settings.PROJECT_ID}/locations/{settings.REGION}/publishers/google/models/{model_id}:predict"
+
+        instance = {
+            "prompt": prompt,
+            "negative_prompt": negative_prompt if negative_prompt else None
+        }
+
+        if image_data and model_id.startswith("lyria-3-pro"):
+            import base64 as b64mod
+            instance["image"] = {
+                "bytesBase64Encoded": b64mod.b64encode(image_data).decode("utf-8")
+            }
+
         payload = {
-            "instances": [
-                {
-                    "prompt": prompt,
-                    "negative_prompt": negative_prompt if negative_prompt else None
-                }
-            ],
+            "instances": [instance],
             "parameters": {
                 "sampleCount": 1,
                 "candidateCount": 1,

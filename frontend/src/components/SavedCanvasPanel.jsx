@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Library, 
-  Play, 
-  Settings2, 
-  Image as ImageIcon, 
-  Type, 
-  Video, 
-  Music, 
+import {
+  Library,
+  Play,
+  Settings2,
+  Image as ImageIcon,
+  Type,
+  Video,
+  Music,
   ChevronRight,
   Loader2,
   Trash2,
   ExternalLink,
   Save
 } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
   const [examples, setExamples] = useState([]);
@@ -22,6 +23,7 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [inputs, setInputs] = useState({});
   const [results, setResults] = useState(null);
+  const [activeFilter, setActiveFilter] = useState('mine');
   const resultsRef = React.useRef(null);
 
   useEffect(() => {
@@ -36,22 +38,34 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    fetchSavedWorkflows();
+  }, [activeFilter]);
+
+  const fetchSavedWorkflows = async () => {
+    try {
+      const savedRes = await apiFetch(`/api/workflow/list?filter=${activeFilter}`);
+      if (savedRes.ok) {
+        const data = await savedRes.json();
+        setSavedWorkflows(data.workflows);
+      }
+    } catch (err) {
+      console.error("Failed to fetch workflows", err);
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
       // Fetch examples
-      const exRes = await fetch('/api/workflow/templates/examples');
+      const exRes = await apiFetch('/api/workflow/templates/examples');
       if (exRes.ok) {
         const data = await exRes.json();
         setExamples(data.workflows);
       }
 
       // Fetch saved
-      const savedRes = await fetch(`/api/workflow/list?user_id=${userId}`);
-      if (savedRes.ok) {
-        const data = await savedRes.json();
-        setSavedWorkflows(data.workflows);
-      }
+      await fetchSavedWorkflows();
     } catch (err) {
       console.error("Failed to fetch workflows", err);
     } finally {
@@ -67,7 +81,7 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
       if (isExample) {
         workflowData = examples.find(e => e.id === wfSummary.id);
       } else {
-        const res = await fetch(`/api/workflow/${wfSummary.id}`);
+        const res = await apiFetch(`/api/workflow/${wfSummary.id}`);
         if (res.ok) {
           workflowData = await res.json();
         }
@@ -123,7 +137,7 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
         })
       };
 
-      const response = await fetch('/api/workflow/execute', {
+      const response = await apiFetch('/api/workflow/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -359,7 +373,25 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
             </section>
 
             <section>
-              <h2 className="text-[10px] font-bold text-white-40 uppercase tracking-[0.2em] mb-4 px-2">Your Saved</h2>
+              <div className="flex items-center gap-1 mb-4 p-1 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+                {[
+                  { id: 'mine', label: 'Mine' },
+                  { id: 'team', label: 'Team' },
+                  { id: 'public', label: 'Public' },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveFilter(tab.id)}
+                    className={`flex-1 px-2 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
+                      activeFilter === tab.id
+                        ? 'bg-blue-600/20 text-blue-400 border border-blue-500/20'
+                        : 'text-white/40 hover:text-white/60 hover:bg-white/[0.04] border border-transparent'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
               <div className="space-y-1">
                 {savedWorkflows.map(wf => (
                   <div key={wf.id} className="group flex items-center gap-1">
@@ -368,15 +400,20 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
                       className={`flex-1 text-left p-3 rounded-l-xl transition-all group flex items-center justify-between ${selectedWorkflow?.id === wf.id ? 'bg-indigo-600/20 text-indigo-400 border-y border-l border-indigo-500/20' : 'text-white-60 hover:bg-white-5 hover:text-white'
                         }`}
                     >
-                      <span className="text-sm font-medium truncate text-white">{wf.name}</span>
-                      <ChevronRight size={14} className={`transition-transform duration-300 ${selectedWorkflow?.id === wf.id ? 'translate-x-1' : 'opacity-0'}`} />
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium truncate text-white block">{wf.name}</span>
+                        {activeFilter !== 'mine' && wf.creator_name && (
+                          <span className="text-[10px] text-white/30 truncate block mt-0.5">by {wf.creator_name}</span>
+                        )}
+                      </div>
+                      <ChevronRight size={14} className={`flex-shrink-0 transition-transform duration-300 ${selectedWorkflow?.id === wf.id ? 'translate-x-1' : 'opacity-0'}`} />
                     </button>
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
                         setLoading(true);
                         try {
-                          const res = await fetch(`/api/workflow/${wf.id}`);
+                          const res = await apiFetch(`/api/workflow/${wf.id}`);
                           if (res.ok) {
                             const data = await res.json();
                             localStorage.setItem('pending_workflow_load', JSON.stringify(data));
@@ -397,7 +434,9 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
                 ))}
                 {savedWorkflows.length === 0 && !loading && (
                     <div className="p-4 text-center border border-dashed border-white-10 rounded-xl">
-                        <p className="text-[10px] text-white-20 leading-relaxed font-medium">No saved workflows yet</p>
+                        <p className="text-[10px] text-white-20 leading-relaxed font-medium">
+                          {activeFilter === 'mine' ? 'No saved workflows yet' : activeFilter === 'team' ? 'No team workflows shared' : 'No public workflows available'}
+                        </p>
                     </div>
                 )}
               </div>

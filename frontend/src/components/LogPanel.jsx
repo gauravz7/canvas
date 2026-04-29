@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, X } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const LogPanel = () => {
   const [logs, setLogs] = useState([]);
@@ -12,7 +13,7 @@ const LogPanel = () => {
     // Fetch initial logs
     const fetchInitial = async () => {
       try {
-        const res = await fetch('/api/logs?limit=50');
+        const res = await apiFetch('/api/logs?limit=50');
         if (res.ok) {
           const data = await res.json();
           setLogs(data);

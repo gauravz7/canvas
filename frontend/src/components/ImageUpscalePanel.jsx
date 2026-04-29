@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Maximize2, Download, AlertCircle } from 'lucide-react';
 import { useConfig } from '../contexts/ConfigContext';
+import { apiFetch } from '../utils/api';
 
 const ImageUpscalePanel = ({ userId }) => {
   const { config } = useConfig();
@@ -42,7 +43,7 @@ const ImageUpscalePanel = ({ userId }) => {
     formData.append('user_id', userId);
 
     try {
-      const response = await fetch('/api/generate/upscale', {
+      const response = await apiFetch('/api/generate/upscale', {
         method: 'POST',
         body: formData,
       });

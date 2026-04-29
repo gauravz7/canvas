@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Maximize2, Image as ImageIcon } from 'lucide-react';
 import { useConfig } from '../contexts/ConfigContext';
+import { apiFetch } from '../utils/api';
 
 const GeminiImagePanel = ({ userId }) => {
   const { config } = useConfig();
@@ -64,7 +65,7 @@ const GeminiImagePanel = ({ userId }) => {
     });
 
     try {
-      const response = await fetch('/api/generate/content', {
+      const response = await apiFetch('/api/generate/content', {
         method: 'POST',
         body: formData,
       });
@@ -99,7 +100,7 @@ const GeminiImagePanel = ({ userId }) => {
     formData.append('user_id', userId);
 
     try {
-      const response = await fetch('/api/generate/upscale', {
+      const response = await apiFetch('/api/generate/upscale', {
         method: 'POST',
         body: formData,
       });

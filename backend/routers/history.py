@@ -1,8 +1,11 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query, Depends
 from typing import List, Optional
-from services.storage_service import storage_service
 from pydantic import BaseModel
 from datetime import datetime
+from sqlalchemy.orm import Session
+from database import get_db
+from models import Asset
+from auth import get_current_user, get_current_user_optional, CurrentUser
 
 router = APIRouter()
 
@@ -22,23 +25,30 @@ class AssetResponse(BaseModel):
     class Config:
         from_attributes = True
 
-@router.get("/{user_id}", response_model=List[AssetResponse])
-async def get_history(
-    user_id: str,
-    limit: int = 50,
-    offset: int = 0
-):
-    assets = storage_service.get_history(user_id, limit, offset)
-    
-    # Enrich with signed URLs for GCS assets
+
+def _enrich_assets(assets):
+    """Add signed URLs for GCS-stored assets."""
     from services.vertex_service import vertex_service
-    
-    # We need to convert SQLAlchemy models to Pydantic or dict to add signed_url
+
     results = []
     for asset in assets:
         asset_dict = {c.name: getattr(asset, c.name) for c in asset.__table__.columns}
         if asset.storage_path.startswith("gs://"):
             asset_dict["signed_url"] = vertex_service.get_signed_url(asset.storage_path)
         results.append(asset_dict)
-        
     return results
+
+
+@router.get("/", response_model=List[AssetResponse])
+async def get_history(
+    asset_type: Optional[str] = Query(None, description="Filter by asset type: image, video, audio"),
+    limit: int = Query(50, ge=1, le=200, description="Number of results to return"),
+    offset: int = Query(0, ge=0, description="Number of results to skip"),
+    current_user: CurrentUser = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Asset).filter(Asset.user_id == current_user.uid)
+    if asset_type:
+        query = query.filter(Asset.asset_type == asset_type)
+    assets = query.order_by(Asset.created_at.desc()).offset(offset).limit(min(limit, 200)).all()
+    return _enrich_assets(assets)

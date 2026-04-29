@@ -101,7 +101,7 @@ class VeoExecutor(BaseNodeExecutor):
                         user_id=user_id
                     )
                     if local_rel_path:
-                         video["url"] = f"/data/assets/{local_rel_path}"
+                         video["url"] = f"/api/media/{local_rel_path}"
                     else:
                         signed_url = self.services['vertex'].get_signed_url(video["uri"])
                         if signed_url:

@@ -1,6 +1,7 @@
 import React, { memo, useState, useEffect, useCallback } from 'react';
 import { Handle, Position, NodeResizer } from '@xyflow/react';
 import { Workflow, X, RefreshCw, AlertCircle, Play } from 'lucide-react';
+import { apiFetch } from '../../../utils/api';
 
 const WorkflowNode = ({ data, isConnectable, selected }) => {
   const [workflows, setWorkflows] = useState([]);
@@ -13,7 +14,7 @@ const WorkflowNode = ({ data, isConnectable, selected }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/workflow/list');
+      const response = await apiFetch('/api/workflow/list');
       if (!response.ok) throw new Error('Failed to fetch workflows');
       const json = await response.json();
       setWorkflows(json.workflows || []);
@@ -31,7 +32,7 @@ const WorkflowNode = ({ data, isConnectable, selected }) => {
       return;
     }
     try {
-      const response = await fetch(`/api/workflow/${id}`);
+      const response = await apiFetch(`/api/workflow/${id}`);
       if (!response.ok) throw new Error('Failed to fetch workflow details');
       const json = await response.json();
       setWorkflowDetails(json);

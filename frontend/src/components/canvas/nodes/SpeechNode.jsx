@@ -1,13 +1,15 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { Handle, Position, NodeResizer } from '@xyflow/react';
-import { Mic, X, Settings, Play } from 'lucide-react';
+import { Mic, X, Play, ChevronDown, ChevronUp } from 'lucide-react';
 import { useConfig } from '../../../contexts/ConfigContext';
 
 const SpeechNode = ({ data, isConnectable, selected }) => {
   const { config } = useConfig();
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const voices = config?.TTS_VOICES || ["Kore", "Leda", "Puck", "Charon", "Fenrir", "Aoede"];
-  const models = config?.TTS_MODELS || ["gemini-2.5-flash-tts"];
+  const models = config?.TTS_MODELS || ["gemini-3.1-flash-tts-preview"];
+  const languages = config?.TTS_LANGUAGES || [{ code: "en", name: "English" }];
 
   const handleConfigChange = (key, value) => {
     if (data.onUpdate) {
@@ -50,7 +52,7 @@ const SpeechNode = ({ data, isConnectable, selected }) => {
             <label className="text-[10px] text-gray-500 font-medium">Model</label>
             <select
               className="bg-gray-900 border border-gray-700 text-[10px] text-gray-300 rounded p-1 w-full focus:outline-none focus:border-green-500"
-              value={data.config?.model_id || config?.DEFAULT_TTS_MODEL || 'gemini-2.5-flash-tts'}
+              value={data.config?.model_id || config?.DEFAULT_TTS_MODEL || 'gemini-3.1-flash-tts-preview'}
               onChange={(e) => handleConfigChange('model_id', e.target.value)}
             >
               {models.map(m => (
@@ -70,6 +72,38 @@ const SpeechNode = ({ data, isConnectable, selected }) => {
                 <option key={v} value={v}>{v}</option>
               ))}
             </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-gray-500 font-medium">Language</label>
+            <select
+              className="bg-gray-900 border border-gray-700 text-[10px] text-gray-300 rounded p-1 w-full focus:outline-none focus:border-green-500"
+              value={data.config?.language || config?.DEFAULT_TTS_LANGUAGE || 'en'}
+              onChange={(e) => handleConfigChange('language', e.target.value)}
+            >
+              {languages.map(l => (
+                <option key={l.code} value={l.code}>{l.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              {showAdvanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              System Instruction
+            </button>
+            {showAdvanced && (
+              <textarea
+                className="w-full mt-1 bg-gray-900 border border-gray-700 text-[10px] text-gray-300 rounded p-1.5 resize-none focus:outline-none focus:border-green-500"
+                rows={3}
+                placeholder="e.g. Speak cheerfully and with enthusiasm..."
+                value={data.config?.system_instruction || ''}
+                onChange={(e) => handleConfigChange('system_instruction', e.target.value)}
+              />
+            )}
           </div>
         </div>
 

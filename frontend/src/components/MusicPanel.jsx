@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Music, Send, Download, RefreshCw, Sparkles, Zap } from 'lucide-react';
 import WaveformPlayer from './WaveformPlayer';
+import { apiFetch } from '../utils/api';
 
 const MusicPanel = ({ userId }) => {
   const [prompt, setPrompt] = useState('An uplifting and hopeful orchestral piece with a soaring string melody and triumphant brass.');
@@ -23,7 +24,7 @@ const MusicPanel = ({ userId }) => {
     formData.append('user_id', userId);
 
     try {
-      const response = await fetch('/api/generate/music', {
+      const response = await apiFetch('/api/generate/music', {
         method: 'POST',
         body: formData,
       });

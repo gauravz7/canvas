@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import WaveformPlayer from './WaveformPlayer';
 import { useConfig } from '../contexts/ConfigContext';
+import { apiFetch } from '../utils/api';
 
 const MOCK_VOICES = ["Kore", "Leda", "Puck", "Charon", "Fenrir", "Aoede", "Zephyr"];
 
@@ -25,7 +26,7 @@ const SingleSpeakerPanel = () => {
     setAudioSrc(null);
 
     try {
-      const response = await fetch('/api/synthesize/single', {
+      const response = await apiFetch('/api/synthesize/single', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

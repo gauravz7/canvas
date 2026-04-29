@@ -3,14 +3,18 @@ import os
 from functools import lru_cache
 
 class Settings:
-    PROJECT_ID: str = "vital-octagon-19612"
+    PROJECT_ID: str = None
     REGION: str = "us-central1"
     TTS_API_ENDPOINT: str = "https://texttospeech.googleapis.com/v1beta1/text:synthesize"
     CREDENTIALS_PATH: str = None
 
-    # Optional: Allow override via env
     def __init__(self):
-        self.PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "vital-octagon-19612")
+        self.PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
+        if not self.PROJECT_ID:
+            import logging
+            logging.getLogger(__name__).warning(
+                "GOOGLE_CLOUD_PROJECT not set. GCP API calls will fail."
+            )
         self.CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         
         # Fallback to local keys.json if it exists and no env var set

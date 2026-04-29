@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import WaveformPlayer from './WaveformPlayer';
 import { useConfig } from '../contexts/ConfigContext';
+import { apiFetch } from '../utils/api';
 
 const MOCK_VOICES = ["Kore", "Leda", "Puck", "Charon", "Fenrir", "Aoede"];
 
@@ -57,7 +58,7 @@ const MultiSpeakerPanel = () => {
     setAudioSrc(null);
 
     try {
-      const response = await fetch('/api/synthesize/multi', {
+      const response = await apiFetch('/api/synthesize/multi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

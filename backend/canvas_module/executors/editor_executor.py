@@ -50,8 +50,8 @@ class EditorExecutor(BaseNodeExecutor):
                 # If still no storage_path, but has 'url', it might be a relative path
                 if not storage_path and "url" in val:
                     url = val["url"]
-                    if url.startswith("/data/assets/"):
-                        storage_path = url.replace("/data/assets/", "")
+                    if url.startswith("/api/media/"):
+                        storage_path = url.replace("/api/media/", "")
 
             # 3. Handle gs:// URIs (download if needed)
             if storage_path and storage_path.startswith("gs://"):
@@ -286,7 +286,7 @@ class EditorExecutor(BaseNodeExecutor):
 
             return {
                 "videos": [{
-                    "url": f"/data/assets/{storage_path}",
+                    "url": f"/api/media/{storage_path}",
                     "storage_path": storage_path,
                     "mime_type": "video/mp4"
                 }]

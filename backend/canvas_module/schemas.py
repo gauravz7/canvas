@@ -10,9 +10,12 @@ class NodeType(str, Enum):
     IMAGEN_UPSCALE = "imagen_upscale"
     SPEECH_GEN = "speech_gen"
     LYRIA_GEN = "lyria_gen"
+    LYRIA_PRO = "lyria_pro"
+    LYRIA_CLIP = "lyria_clip"
     VEO_STANDARD = "veo_standard"
     VEO_EXTEND = "veo_extend"
     VEO_REFERENCE = "veo_reference"
+    VEO_UPSCALE = "veo_upscale"
     EDITOR = "editor"
     WORKFLOW = "workflow" # Nested workflow
 
@@ -33,7 +36,7 @@ class Connection(BaseModel):
 class NodeData(BaseModel):
     label: str = ""
     value: Any = None # Static value for input nodes
-    model: str = "gemini-3-pro-preview" # Default model
+    model: str = "gemini-3.1-pro-preview"
     system_instruction: Optional[str] = None
     output_key: str = "output" # Key to store output in execution context
     prompt_template: Optional[str] = None # e.g. "Describe {{input_node_id.output}}"
