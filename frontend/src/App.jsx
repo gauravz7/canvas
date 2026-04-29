@@ -346,7 +346,7 @@ function AppContent() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 flex flex-col overflow-hidden bg-main-gradient">
+        <main className="flex-1 flex flex-col overflow-hidden bg-main-gradient" style={{ position: 'relative' }}>
           {/* Canvas - always mounted, hidden when other tabs active to preserve state */}
           <div style={{
             display: activeTab === 'canvas' ? 'flex' : 'none',
