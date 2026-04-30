@@ -26,7 +26,7 @@ function AppContent() {
 
   // Workflow tabs state
   const [workflowTabs, setWorkflowTabs] = useState([
-    { id: uuidv4(), name: 'Untitled Workflow', nodes: [], edges: [] }
+    { id: uuidv4(), name: 'Untitled Workflow', nodes: [], edges: [], _isInitial: true }
   ]);
   const [activeWorkflowIdx, setActiveWorkflowIdx] = useState(0);
   const [renamingTabIdx, setRenamingTabIdx] = useState(null);
@@ -51,9 +51,10 @@ function AppContent() {
   const [teamError, setTeamError] = useState('');
 
   const addNewTab = () => {
-    const newTab = { id: uuidv4(), name: 'Untitled Workflow', nodes: [], edges: [] };
+    const newTabId = uuidv4();
+    const newTab = { id: newTabId, name: 'Untitled Workflow', nodes: [], edges: [] };
     setWorkflowTabs(prev => [...prev, newTab]);
-    setActiveWorkflowIdx(workflowTabs.length);
+    setPendingTabSwitch(newTabId);
   };
 
   const openWorkflowInNewTab = (workflowData) => {

@@ -115,7 +115,8 @@ const CanvasPage = ({ userId = 'default_user', initialData, onStateChange }) => 
       }
     }
 
-    if (nodes.length === 0 && !initialData?.nodes?.length) {
+    // Only load sample workflow on the FIRST initial tab when empty
+    if (nodes.length === 0 && initialData?._isInitial) {
       // Sample Workflow
       const sampleNodes = [
         { id: '1', type: 'gemini_text', position: { x: 100, y: 100 }, data: { label: 'Start Idea', value: 'Explain quantum computing in 5 words' } },
