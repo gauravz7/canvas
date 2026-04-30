@@ -450,14 +450,25 @@ function AppContent() {
                   title="New Workflow"
                 >+ New</button>
               </div>
-              {/* Canvas */}
+              {/* Canvas - render ALL tabs simultaneously, hide inactive (preserves state) */}
               <div style={{ flex: 1, position: 'relative' }}>
-                <CanvasPage
-                  key={workflowTabs[activeWorkflowIdx]?.id}
-                  userId={userId}
-                  initialData={workflowTabs[activeWorkflowIdx]}
-                  onStateChange={(state) => updateTabState(activeWorkflowIdx, state)}
-                />
+                {workflowTabs.map((tab, idx) => (
+                  <div
+                    key={tab.id}
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      visibility: idx === activeWorkflowIdx ? 'visible' : 'hidden',
+                      pointerEvents: idx === activeWorkflowIdx ? 'auto' : 'none',
+                    }}
+                  >
+                    <CanvasPage
+                      userId={userId}
+                      initialData={tab}
+                      onStateChange={(state) => updateTabState(idx, state)}
+                    />
+                  </div>
+                ))}
               </div>
             </>
           </div>

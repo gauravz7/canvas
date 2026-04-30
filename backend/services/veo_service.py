@@ -13,6 +13,23 @@ import uuid
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+_MODEL_MIGRATIONS = {
+    "veo-3.1-generate-preview": "veo-3.1-generate-001",
+    "veo-3.1-fast-generate-preview": "veo-3.1-fast-generate-001",
+    "veo-3.1-lite-generate-preview": "veo-3.1-lite-generate-001",
+}
+
+
+def _migrate_model(model_id: str) -> str:
+    if not model_id:
+        return "veo-3.1-lite-generate-001"
+    if model_id in _MODEL_MIGRATIONS:
+        new = _MODEL_MIGRATIONS[model_id]
+        logger.warning(f"Auto-migrating deprecated model {model_id} -> {new}")
+        return new
+    return model_id
+
+
 class VeoService:
     def __init__(self, project_id: str, location: str = "us-central1"):
         self.project_id = project_id
@@ -120,8 +137,9 @@ class VeoService:
         config_params: Dict[str, Any] = None
     ):
         """Standard/Fast Veo 3.1 generation (Text/Image-to-Video)."""
+        model_id = _migrate_model(model_id)
         config_params = config_params or {}
-        
+
         output_uri = f"gs://{model_config.VEO_BUCKET}/veo_outputs/{uuid.uuid4()}"
 
         # Build config
@@ -164,6 +182,10 @@ class VeoService:
         config_params: Dict[str, Any] = None
     ):
         """Veo 3.1 Preview (Subject-to-Video)."""
+        model_id = _migrate_model(model_id)
+        if "lite" in model_id.lower():
+            model_id = "veo-3.1-fast-generate-001"
+            logger.warning(f"Reference doesn't support lite, upgraded to {model_id}")
         config_params = config_params or {}
         
         # Build references
@@ -213,6 +235,10 @@ class VeoService:
         next_video_mime_type: Optional[str] = None,
         config_params: Dict[str, Any] = None
     ):
+        model_id = _migrate_model(model_id)
+        if "lite" in model_id.lower():
+            model_id = "veo-3.1-fast-generate-001"
+            logger.warning(f"Extend doesn't support lite, upgraded to {model_id}")
         """Veo 3.1 Preview Video Extension / Transition."""
         config_params = config_params or {}
         

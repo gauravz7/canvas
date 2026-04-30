@@ -152,7 +152,7 @@ async def list_workflows(
         ]
     )
 @router.get("/{workflow_id}", response_model=Dict[str, Any])
-async def get_workflow(workflow_id: str, current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_workflow(workflow_id: str, current_user: CurrentUser = Depends(get_current_user_optional), db: Session = Depends(get_db)):
     """
     Get a specific workflow by ID.
     """
