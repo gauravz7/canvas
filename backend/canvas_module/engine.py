@@ -586,16 +586,39 @@ class WorkflowEngine:
             for val in image_inputs:
                 if isinstance(val, dict) and "images" in val:
                     for img in val["images"]:
-                        contents.append(self._parse_input(f"data:{img['mime_type']};base64,{img['data']}"))
-                elif isinstance(val, dict) and "data" in val and "mime_type" in val:
-                    # Handle single image dict directly
-                    contents.append(self._parse_input(f"data:{val['mime_type']};base64,{val['data']}"))
+                        img_bytes = None
+                        if "data" in img and img["data"]:
+                            try:
+                                img_bytes = base64.b64decode(img["data"]) if isinstance(img["data"], str) else img["data"]
+                            except Exception:
+                                pass
+                        if not img_bytes and "url" in img:
+                            img_bytes = self._resolve_url_to_bytes(img["url"])
+                        if img_bytes:
+                            contents.append(types.Part(inline_data=types.Blob(
+                                data=img_bytes,
+                                mime_type=img.get("mime_type", "image/png")
+                            )))
+                elif isinstance(val, dict) and ("data" in val or "url" in val):
+                    img_bytes = None
+                    if val.get("data"):
+                        try:
+                            img_bytes = base64.b64decode(val["data"]) if isinstance(val["data"], str) else val["data"]
+                        except Exception:
+                            pass
+                    if not img_bytes and val.get("url"):
+                        img_bytes = self._resolve_url_to_bytes(val["url"])
+                    if img_bytes:
+                        contents.append(types.Part(inline_data=types.Blob(
+                            data=img_bytes,
+                            mime_type=val.get("mime_type", "image/png")
+                        )))
                 else:
                     parsed = self._parse_input(val)
-                    if parsed and not isinstance(parsed, str): # It's a types.Part for image/video/etc
+                    if parsed and not isinstance(parsed, str):
                         contents.append(parsed)
                     elif isinstance(val, str) and val.startswith("data:"):
-                         contents.append(parsed) 
+                        contents.append(parsed)
             
             # Process 'other' inputs (video, audio, docs, or generic files)
             for val in other_inputs:
