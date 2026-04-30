@@ -51,9 +51,13 @@ function AppContent() {
       nodes: workflowData.nodes || [],
       edges: workflowData.edges || []
     };
-    setWorkflowTabs(prev => [...prev, newTab]);
-    setActiveWorkflowIdx(workflowTabs.length);
     setActiveTab('canvas');
+    setWorkflowTabs(prev => {
+      const newTabs = [...prev, newTab];
+      // Schedule activeIdx update after the array update
+      setTimeout(() => setActiveWorkflowIdx(newTabs.length - 1), 0);
+      return newTabs;
+    });
   };
 
   const closeTab = (idx) => {

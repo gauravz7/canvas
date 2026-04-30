@@ -365,13 +365,23 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas, onOpenInNewTab }) => {
                 {examples.map(wf => (
                   <button
                     key={wf.id}
-                    onClick={() => handleSelectWorkflow(wf, true)}
-                    className={`w-full text-left p-3 rounded-xl transition-all group flex items-center justify-between ${
-                      selectedWorkflow?.id === wf.id ? 'bg-blue-600/20 text-blue-400 border border-blue-500/20' : 'text-white-60 hover:bg-white-5 hover:text-white'
-                    }`}
+                    onClick={() => {
+                      if (onOpenInNewTab) {
+                        onOpenInNewTab({
+                          id: wf.id + '-' + Date.now(),
+                          name: wf.name,
+                          nodes: wf.nodes || [],
+                          edges: wf.edges || []
+                        });
+                      } else {
+                        handleSelectWorkflow(wf, true);
+                      }
+                    }}
+                    className="w-full text-left p-3 rounded-xl transition-all group flex items-center justify-between text-white-60 hover:bg-white-5 hover:text-white"
+                    title="Click to open in a new tab"
                   >
                     <span className="text-sm font-medium truncate text-white">{wf.name}</span>
-                    <ChevronRight size={14} className={`transition-transform duration-300 ${selectedWorkflow?.id === wf.id ? 'translate-x-1' : 'opacity-0'}`} />
+                    <ChevronRight size={14} className="opacity-40 group-hover:opacity-100 transition-opacity" />
                   </button>
                 ))}
               </div>
@@ -401,9 +411,29 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas, onOpenInNewTab }) => {
                 {savedWorkflows.map(wf => (
                   <div key={wf.id} className="group flex items-center gap-1">
                     <button
-                      onClick={() => handleSelectWorkflow(wf)}
-                      className={`flex-1 text-left p-3 rounded-l-xl transition-all group flex items-center justify-between ${selectedWorkflow?.id === wf.id ? 'bg-indigo-600/20 text-indigo-400 border-y border-l border-indigo-500/20' : 'text-white-60 hover:bg-white-5 hover:text-white'
-                        }`}
+                      onClick={async () => {
+                        setLoading(true);
+                        try {
+                          const res = await apiFetch(`/api/workflow/${wf.id}`);
+                          if (res.ok) {
+                            const data = await res.json();
+                            if (onOpenInNewTab) {
+                              onOpenInNewTab({
+                                id: wf.id + '-' + Date.now(),
+                                name: wf.name || data.name || 'Loaded Workflow',
+                                nodes: data.nodes || [],
+                                edges: data.edges || []
+                              });
+                            }
+                          }
+                        } catch (err) {
+                          console.error("Failed to load workflow", err);
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      className="flex-1 text-left p-3 rounded-l-xl transition-all group flex items-center justify-between text-white-60 hover:bg-white-5 hover:text-white"
+                      title="Click to open in a new tab"
                     >
                       <div className="min-w-0">
                         <span className="text-sm font-medium truncate text-white block">{wf.name}</span>
@@ -411,37 +441,27 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas, onOpenInNewTab }) => {
                           <span className="text-[10px] text-white/30 truncate block mt-0.5">by {wf.creator_name}</span>
                         )}
                       </div>
-                      <ChevronRight size={14} className={`flex-shrink-0 transition-transform duration-300 ${selectedWorkflow?.id === wf.id ? 'translate-x-1' : 'opacity-0'}`} />
+                      <ChevronRight size={14} className="flex-shrink-0 opacity-40 group-hover:opacity-100 transition-opacity" />
                     </button>
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
+                        // Old preview-pane mode, kept for compat
                         setLoading(true);
                         try {
                           const res = await apiFetch(`/api/workflow/${wf.id}`);
                           if (res.ok) {
                             const data = await res.json();
-                            // Open in NEW workflow tab
-                            if (onOpenInNewTab) {
-                              onOpenInNewTab({
-                                id: wf.id,
-                                name: wf.name || data.name,
-                                nodes: data.nodes || [],
-                                edges: data.edges || []
-                              });
-                            } else {
-                              localStorage.setItem('pending_workflow_load', JSON.stringify(data));
-                              onSwitchToCanvas();
-                            }
+                            handleSelectWorkflow({...wf, ...data});
                           }
                         } catch (err) {
-                          console.error("Failed to load workflow for editing", err);
+                          console.error("Preview failed", err);
                         } finally {
                           setLoading(false);
                         }
                       }}
                       className="p-3 rounded-r-xl bg-white-5 hover:bg-white-10 text-white-40 hover:text-white transition-all border-y border-r border-white-10"
-                      title="Open in new workflow tab"
+                      title="Show preview pane"
                     >
                       <Settings2 size={14} />
                     </button>
