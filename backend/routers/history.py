@@ -47,7 +47,10 @@ async def get_history(
     current_user: CurrentUser = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Asset).filter(Asset.user_id == current_user.uid)
+    user_ids = [current_user.uid]
+    if current_user.uid != "default":
+        user_ids.append("default")
+    query = db.query(Asset).filter(Asset.user_id.in_(user_ids))
     if asset_type:
         query = query.filter(Asset.asset_type == asset_type)
     assets = query.order_by(Asset.created_at.desc()).offset(offset).limit(min(limit, 200)).all()

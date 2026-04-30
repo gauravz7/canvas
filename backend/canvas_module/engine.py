@@ -798,6 +798,8 @@ class WorkflowEngine:
                 result = await vertex_service.generate_music(prompt=prompt, model_id=model_id)
 
             b64_audio = result.get("audioContent")
+            lyrics = result.get("lyrics")
+            mime_type = "audio/mpeg" if model_id.startswith("lyria-3") else "audio/mp3"
             audio_content = base64.b64decode(b64_audio)
 
             asset = await asyncio.to_thread(
@@ -805,18 +807,22 @@ class WorkflowEngine:
                 user_id=user_id,
                 content=audio_content,
                 asset_type="audio",
-                mime_type="audio/mp3",
+                mime_type=mime_type,
                 prompt=prompt[:100],
-                model_id=model_id
+                model_id=model_id,
+                meta_data={"lyrics": lyrics} if lyrics else None
             )
 
-            return {
+            output = {
                 "audio": {
                     "data": b64_audio,
-                    "mime_type": "audio/mp3",
+                    "mime_type": mime_type,
                     "storage_path": asset.storage_path
                 }
             }
+            if lyrics:
+                output["lyrics"] = lyrics
+            return output
 
         # 6. VEO Nodes
         if node.type in [NodeType.VEO_STANDARD, NodeType.VEO_EXTEND, NodeType.VEO_REFERENCE]:

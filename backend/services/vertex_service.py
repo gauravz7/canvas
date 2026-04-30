@@ -140,6 +140,67 @@ class VertexService:
             raise Exception("Failed to extract upscaled image from Vertex AI response. Check logs for details.")
 
     async def generate_music(self, prompt: str, negative_prompt: str = "", seed: int = 12345, model_id: str = "lyria-3-clip-preview", image_data: bytes = None) -> Dict[str, Any]:
+        import base64 as b64mod
+
+        if model_id.startswith("lyria-3"):
+            return await self._generate_music_v3(prompt, model_id, image_data)
+        else:
+            return await self._generate_music_v2(prompt, negative_prompt)
+
+    async def _generate_music_v3(self, prompt: str, model_id: str, image_data: bytes = None) -> Dict[str, Any]:
+        import base64 as b64mod
+
+        token = self._get_token()
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json; charset=utf-8"
+        }
+
+        endpoint = f"https://aiplatform.googleapis.com/v1beta1/projects/{settings.PROJECT_ID}/locations/global/interactions"
+
+        input_items = [{"type": "text", "text": prompt}]
+
+        if image_data and model_id.startswith("lyria-3-pro"):
+            input_items.append({
+                "type": "image",
+                "mime_type": "image/jpeg",
+                "data": b64mod.b64encode(image_data).decode("utf-8")
+            })
+
+        payload = {
+            "model": model_id,
+            "input": input_items
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                endpoint,
+                json=payload,
+                headers=headers,
+                timeout=300.0
+            )
+
+            if response.status_code != 200:
+                raise Exception(f"Lyria 3 API Error {response.status_code}: {response.text[:500]}")
+
+            data = response.json()
+
+        outputs = data.get("outputs", [])
+        audio_data = None
+        lyrics = None
+
+        for output in outputs:
+            if output.get("type") == "audio" and output.get("data"):
+                audio_data = output["data"]
+            elif output.get("type") == "text" and not lyrics:
+                lyrics = output.get("text", "")
+
+        if not audio_data:
+            raise Exception(f"No audio in Lyria 3 response: {list(o.get('type') for o in outputs)}")
+
+        return {"audioContent": audio_data, "lyrics": lyrics}
+
+    async def _generate_music_v2(self, prompt: str, negative_prompt: str = "") -> Dict[str, Any]:
         token = self._get_token()
         headers = {
             "Authorization": f"Bearer {token}",
@@ -147,48 +208,31 @@ class VertexService:
             "Content-Type": "application/json; charset=utf-8"
         }
 
-        endpoint = f"https://{settings.REGION}-aiplatform.googleapis.com/v1/projects/{settings.PROJECT_ID}/locations/{settings.REGION}/publishers/google/models/{model_id}:predict"
-
-        instance = {
-            "prompt": prompt,
-            "negative_prompt": negative_prompt if negative_prompt else None
-        }
-
-        if image_data and model_id.startswith("lyria-3-pro"):
-            import base64 as b64mod
-            instance["image"] = {
-                "bytesBase64Encoded": b64mod.b64encode(image_data).decode("utf-8")
-            }
+        endpoint = f"https://{settings.REGION}-aiplatform.googleapis.com/v1/projects/{settings.PROJECT_ID}/locations/{settings.REGION}/publishers/google/models/lyria-002:predict"
 
         payload = {
-            "instances": [instance],
+            "instances": [{
+                "prompt": prompt,
+                "negative_prompt": negative_prompt if negative_prompt else None
+            }],
             "parameters": {
                 "sampleCount": 1,
                 "candidateCount": 1,
-                "audioConfig": {
-                    "audioEncoding": "MP3"
-                }
+                "audioConfig": {"audioEncoding": "MP3"}
             }
         }
-        
+
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                endpoint,
-                json=payload,
-                headers=headers,
-                timeout=120.0
-            )
-            
+            response = await client.post(endpoint, json=payload, headers=headers, timeout=120.0)
+
             if response.status_code != 200:
-                raise Exception(f"Lyria API Error {response.status_code}: {response.text}")
-            
+                raise Exception(f"Lyria 2 API Error {response.status_code}: {response.text}")
+
             data = response.json()
             if "predictions" not in data or not data["predictions"]:
                 raise Exception(f"No predictions in response: {data}")
-            
-            # Lyria returns audioContent or bytesBase64Encoded in predictions
+
             prediction = data["predictions"][0]
-            # Normalize to include 'audioContent' for the router if it's missing but bytesBase64Encoded is present
             if "bytesBase64Encoded" in prediction and "audioContent" not in prediction:
                 prediction["audioContent"] = prediction["bytesBase64Encoded"]
             return prediction

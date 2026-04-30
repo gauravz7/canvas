@@ -3,7 +3,7 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Workflow as WorkflowModel, TeamMember
-from auth import get_current_user, CurrentUser
+from auth import get_current_user, get_current_user_optional, CurrentUser
 from .schemas import Workflow, ExecutionRequest, WorkflowExecutionResponse, NodeType, BatchExecutionRequest, BatchExecutionResponse
 from .engine import WorkflowEngine
 import json
@@ -28,7 +28,7 @@ router = APIRouter()
 engine = WorkflowEngine()
 
 @router.post("/execute/stream")
-async def stream_execute_workflow(request: ExecutionRequest, current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+async def stream_execute_workflow(request: ExecutionRequest, current_user: CurrentUser = Depends(get_current_user_optional), db: Session = Depends(get_db)):
     return StreamingResponse(
         engine.stream_workflow_execution(
             request.workflow,
@@ -50,7 +50,7 @@ async def cancel_workflow(execution_id: str):
         raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found or already finished")
 
 @router.post("/execute", response_model=WorkflowExecutionResponse)
-async def execute_workflow(request: ExecutionRequest, current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+async def execute_workflow(request: ExecutionRequest, current_user: CurrentUser = Depends(get_current_user_optional), db: Session = Depends(get_db)):
     try:
         results = await engine.execute_workflow(request.workflow, request.node_ids, user_id=current_user.uid, db=db, use_cache=request.use_cache)
         
