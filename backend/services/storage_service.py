@@ -138,6 +138,21 @@ class StorageService:
             logger.error(f"Error downloading GCS blob {gcs_uri}: {e}")
             return None
 
+    def upload_to_gcs(self, data: bytes, bucket_name: str, mime_type: str = "video/mp4") -> str:
+        import uuid as _uuid
+        blob_path = f"uploads/{_uuid.uuid4()}.mp4"
+        try:
+            client = storage.Client()
+            bucket = client.bucket(bucket_name)
+            blob = bucket.blob(blob_path)
+            blob.upload_from_string(data, content_type=mime_type)
+            gcs_uri = f"gs://{bucket_name}/{blob_path}"
+            logger.info(f"Uploaded {len(data)} bytes to {gcs_uri}")
+            return gcs_uri
+        except Exception as e:
+            logger.error(f"GCS upload failed: {e}")
+            raise
+
     def _get_ext_from_mime(self, mime_type: str) -> str:
         if "jpeg" in mime_type or "jpg" in mime_type: return ".jpg"
         if "png" in mime_type: return ".png"

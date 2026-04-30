@@ -448,6 +448,33 @@ class WorkflowEngine:
 
         return output
 
+    def _resolve_video_to_gcs(self, video_val: Any) -> Optional[str]:
+        gcs_uri = None
+
+        if isinstance(video_val, str) and video_val.startswith("gs://"):
+            return video_val
+
+        if isinstance(video_val, dict):
+            gcs_uri = video_val.get("uri") or video_val.get("gcs_uri")
+            if gcs_uri and gcs_uri.startswith("gs://"):
+                return gcs_uri
+
+            if "videos" in video_val:
+                for v in video_val["videos"]:
+                    if isinstance(v, dict):
+                        uri = v.get("uri") or v.get("gcs_uri")
+                        if uri and uri.startswith("gs://"):
+                            return uri
+
+        video_bytes = self._extract_media_bytes(video_val)
+        if video_bytes:
+            bucket = model_config.VEO_BUCKET
+            gcs_uri = storage_service.upload_to_gcs(video_bytes, bucket, "video/mp4")
+            logger.info(f"Uploaded local video to GCS: {gcs_uri}")
+            return gcs_uri
+
+        return None
+
     def _flatten(self, val: Any) -> List[Any]:
         """Recursively flattens a list of inputs."""
         if not isinstance(val, list):
@@ -848,18 +875,21 @@ class WorkflowEngine:
             
             elif node.type == NodeType.VEO_EXTEND:
                 video_inputs = inputs.get("video", [])
-                video_info = self._extract_media_info(video_inputs[0]) if video_inputs else {"data": None, "mime_type": None}
-                
+                video_gcs = self._resolve_video_to_gcs(video_inputs[0]) if video_inputs else None
+                video_input = video_gcs if video_gcs else (self._extract_media_info(video_inputs[0])["data"] if video_inputs else None)
+                video_mime = "video/mp4"
+
                 next_video_inputs = inputs.get("next_video", [])
-                next_video_info = self._extract_media_info(next_video_inputs[0]) if next_video_inputs else {"data": None, "mime_type": None}
+                next_video_gcs = self._resolve_video_to_gcs(next_video_inputs[0]) if next_video_inputs else None
+                next_video_input = next_video_gcs if next_video_gcs else (self._extract_media_info(next_video_inputs[0])["data"] if next_video_inputs else None)
 
                 response = await veo_service.extend_video_v31_preview(
                     model_id=node.data.model or model_config.DEFAULT_VEO_MODEL,
                     prompt=prompt,
-                    video_input=video_info["data"],
-                    video_mime_type=video_info["mime_type"],
-                    next_video_input=next_video_info["data"],
-                    next_video_mime_type=next_video_info["mime_type"],
+                    video_input=video_input,
+                    video_mime_type=video_mime,
+                    next_video_input=next_video_input,
+                    next_video_mime_type=video_mime,
                     config_params=config
                 )
             
@@ -930,20 +960,10 @@ class WorkflowEngine:
 
             config = node.data.config or {}
 
-            video_val = video_inputs[0]
-            gcs_uri = None
-            if isinstance(video_val, str) and video_val.startswith("gs://"):
-                gcs_uri = video_val
-            elif isinstance(video_val, dict):
-                gcs_uri = video_val.get("uri") or video_val.get("gcs_uri")
-                if not gcs_uri and "videos" in video_val:
-                    for v in video_val["videos"]:
-                        if isinstance(v, dict) and v.get("uri"):
-                            gcs_uri = v["uri"]
-                            break
+            gcs_uri = self._resolve_video_to_gcs(video_inputs[0])
 
-            if not gcs_uri or not gcs_uri.startswith("gs://"):
-                return {"error": "Video upscale requires a GCS URI. Connect a Veo output node."}
+            if not gcs_uri:
+                return {"error": "Could not resolve video input. Provide a video file or connect a Veo output."}
 
             response = await veo_service.upscale_video(
                 video_gcs_uri=gcs_uri,
