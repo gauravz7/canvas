@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 
-const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
+const SavedCanvasPanel = ({ userId, onSwitchToCanvas, onOpenInNewTab }) => {
   const [examples, setExamples] = useState([]);
   const [savedWorkflows, setSavedWorkflows] = useState([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState(null);
@@ -236,7 +236,7 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
           
           <button
             onClick={() => {
-              localStorage.setItem('pending_workflow_load', JSON.stringify({
+              const wfWithInputs = {
                 ...selectedWorkflow,
                 nodes: selectedWorkflow.nodes.map(node => {
                   if (node.type === 'input' && inputs[node.id] !== undefined) {
@@ -244,12 +244,17 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
                   }
                   return node;
                 })
-              }));
-              onSwitchToCanvas();
+              };
+              if (onOpenInNewTab) {
+                onOpenInNewTab(wfWithInputs);
+              } else {
+                localStorage.setItem('pending_workflow_load', JSON.stringify(wfWithInputs));
+                onSwitchToCanvas();
+              }
             }}
             className="px-6 py-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold border border-blue-500/20 shadow-lg shadow-blue-900/30 transition-all active:scale-95"
           >
-            Open in Canvas to Edit
+            Open in New Tab to Edit
           </button>
         </div>
       </div>
@@ -331,7 +336,7 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
   };
 
   return (
-    <div className="studio-container p-8">
+    <div className="p-8" style={{ minHeight: '100%', backgroundColor: '#0a0a0a' }}>
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -416,8 +421,18 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
                           const res = await apiFetch(`/api/workflow/${wf.id}`);
                           if (res.ok) {
                             const data = await res.json();
-                            localStorage.setItem('pending_workflow_load', JSON.stringify(data));
-                            onSwitchToCanvas();
+                            // Open in NEW workflow tab
+                            if (onOpenInNewTab) {
+                              onOpenInNewTab({
+                                id: wf.id,
+                                name: wf.name || data.name,
+                                nodes: data.nodes || [],
+                                edges: data.edges || []
+                              });
+                            } else {
+                              localStorage.setItem('pending_workflow_load', JSON.stringify(data));
+                              onSwitchToCanvas();
+                            }
                           }
                         } catch (err) {
                           console.error("Failed to load workflow for editing", err);
@@ -426,7 +441,7 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas }) => {
                         }
                       }}
                       className="p-3 rounded-r-xl bg-white-5 hover:bg-white-10 text-white-40 hover:text-white transition-all border-y border-r border-white-10"
-                      title="Edit original workflow"
+                      title="Open in new workflow tab"
                     >
                       <Settings2 size={14} />
                     </button>

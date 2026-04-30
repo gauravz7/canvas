@@ -154,12 +154,17 @@ class StorageService:
             raise
 
     def _get_ext_from_mime(self, mime_type: str) -> str:
-        if "jpeg" in mime_type or "jpg" in mime_type: return ".jpg"
-        if "png" in mime_type: return ".png"
-        if "mp4" in mime_type: return ".mp4"
-        if "cwav" in mime_type: return ".cwav" # Custom audio format?
-        if "wav" in mime_type: return ".wav"
-        if "mp3" in mime_type: return ".mp3"
+        if not mime_type:
+            return ""
+        m = mime_type.lower()
+        if "jpeg" in m or "jpg" in m: return ".jpg"
+        if "png" in m: return ".png"
+        if "webp" in m: return ".webp"
+        if "mp4" in m: return ".mp4"
+        if "webm" in m: return ".webm"
+        if "wav" in m: return ".wav"
+        if "mpeg" in m or "mp3" in m: return ".mp3"
+        if "ogg" in m: return ".ogg"
         return ""
 
 storage_service = StorageService()

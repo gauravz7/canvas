@@ -44,6 +44,18 @@ function AppContent() {
     setActiveWorkflowIdx(workflowTabs.length);
   };
 
+  const openWorkflowInNewTab = (workflowData) => {
+    const newTab = {
+      id: workflowData.id || uuidv4(),
+      name: workflowData.name || 'Loaded Workflow',
+      nodes: workflowData.nodes || [],
+      edges: workflowData.edges || []
+    };
+    setWorkflowTabs(prev => [...prev, newTab]);
+    setActiveWorkflowIdx(workflowTabs.length);
+    setActiveTab('canvas');
+  };
+
   const closeTab = (idx) => {
     if (workflowTabs.length <= 1) return;
     setWorkflowTabs(prev => prev.filter((_, i) => i !== idx));
@@ -458,7 +470,11 @@ function AppContent() {
 
           {activeTab === 'templates' && (
             <div className="absolute inset-0 z-10 overflow-y-auto custom-scrollbar">
-              <SavedCanvasPanel userId={userId} onSwitchToCanvas={() => setActiveTab('canvas')} />
+              <SavedCanvasPanel
+                userId={userId}
+                onSwitchToCanvas={() => setActiveTab('canvas')}
+                onOpenInNewTab={openWorkflowInNewTab}
+              />
             </div>
           )}
 

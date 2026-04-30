@@ -883,8 +883,13 @@ class WorkflowEngine:
                 next_video_gcs = self._resolve_video_to_gcs(next_video_inputs[0]) if next_video_inputs else None
                 next_video_input = next_video_gcs if next_video_gcs else (self._extract_media_info(next_video_inputs[0])["data"] if next_video_inputs else None)
 
+                model_id = node.data.model or model_config.DEFAULT_VEO_MODEL
+                if "lite" in model_id.lower():
+                    model_id = "veo-3.1-fast-generate-001"
+                    logger.warning(f"Veo Extend doesn't support lite model; auto-upgraded to {model_id}")
+
                 response = await veo_service.extend_video_v31_preview(
-                    model_id=node.data.model or model_config.DEFAULT_VEO_MODEL,
+                    model_id=model_id,
                     prompt=prompt,
                     video_input=video_input,
                     video_mime_type=video_mime,
@@ -892,7 +897,7 @@ class WorkflowEngine:
                     next_video_mime_type=video_mime,
                     config_params=config
                 )
-            
+
             elif node.type == NodeType.VEO_REFERENCE:
                 image_inputs = inputs.get("image", [])
                 reference_assets = []
@@ -900,9 +905,14 @@ class WorkflowEngine:
                     info = self._extract_media_info(val)
                     if info["data"]:
                         reference_assets.append(info["data"])
-                
+
+                model_id = node.data.model or model_config.DEFAULT_VEO_MODEL
+                if "lite" in model_id.lower():
+                    model_id = "veo-3.1-fast-generate-001"
+                    logger.warning(f"Veo Reference doesn't support lite model; auto-upgraded to {model_id}")
+
                 response = await veo_service.generate_video_v31_preview(
-                    model_id=node.data.model or model_config.DEFAULT_VEO_MODEL,
+                    model_id=model_id,
                     prompt=prompt,
                     reference_assets=reference_assets,
                     config_params=config

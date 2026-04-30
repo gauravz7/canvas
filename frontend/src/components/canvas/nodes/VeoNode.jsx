@@ -9,7 +9,13 @@ const VeoNode = ({ data, isConnectable, selected }) => {
   const isExtend = data.type === 'veo_extend';
   const isReference = data.type === 'veo_reference';
 
-  const models = config?.VEO_MODELS || [];
+  const allModels = config?.VEO_MODELS || [];
+  // Reference and Extend require non-lite models
+  const supportsLite = isStandard;
+  const models = supportsLite ? allModels : allModels.filter(m => !m.includes('lite'));
+  const defaultModel = supportsLite
+    ? (config?.DEFAULT_VEO_MODEL || allModels[0] || '')
+    : (allModels.find(m => m.includes('fast')) || allModels.find(m => !m.includes('lite')) || '');
 
   const handleConfigChange = (key, value) => {
     if (data.onUpdate) {
@@ -59,14 +65,19 @@ const VeoNode = ({ data, isConnectable, selected }) => {
             <label className="text-[10px] text-gray-500 font-medium">Model</label>
             <select
               className="bg-gray-900 border border-gray-700 text-[10px] text-gray-300 rounded p-1 w-full focus:outline-none focus:border-purple-500"
-              value={data.model || ""}
+              value={data.model || defaultModel}
               onChange={handleModelChange}
             >
-              <option value="" disabled>Select Model</option>
+              {models.length === 0 && <option value="" disabled>Loading models...</option>}
               {models.map(m => (
                 <option key={m} value={m}>{m}</option>
               ))}
             </select>
+            {!supportsLite && (
+              <span className="text-[9px] text-amber-400/70 mt-0.5">
+                {isReference ? 'Reference' : 'Extend'} requires non-lite model
+              </span>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">

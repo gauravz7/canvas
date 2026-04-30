@@ -209,8 +209,8 @@ async def generate_video(
         
         # 1. Video Extension (Video Input Present)
         if video_input:
-            if "preview" not in model_id.lower():
-                 raise HTTPException(status_code=400, detail="Video extension requires a preview model (e.g. veo-3.1-generate-preview).")
+            if "lite" in model_id.lower():
+                raise HTTPException(status_code=400, detail="Video extension is not supported on veo-3.1-lite-generate-001. Use veo-3.1-generate-001 or veo-3.1-fast-generate-001.")
             res = await veo_service.extend_video_v31_preview(
                 model_id=model_id,
                 prompt=prompt,
@@ -221,8 +221,8 @@ async def generate_video(
 
         # 2. Subject Reference (References Present)
         elif references:
-            if "preview" not in model_id.lower():
-                 raise HTTPException(status_code=400, detail="Subject reference requires a preview model.")
+            if "lite" in model_id.lower():
+                raise HTTPException(status_code=400, detail="Subject reference is not supported on veo-3.1-lite-generate-001. Use veo-3.1-generate-001 or veo-3.1-fast-generate-001.")
             res = await veo_service.generate_video_v31_preview(
                 model_id=model_id,
                 prompt=prompt,
