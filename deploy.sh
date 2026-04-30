@@ -4,18 +4,22 @@ set -e
 SERVICE_NAME="vibe-studio-refactor"
 REGION="us-central1"
 PROJECT_ID=${GOOGLE_CLOUD_PROJECT:?"Error: GOOGLE_CLOUD_PROJECT env var must be set"}
+IMAGE="gcr.io/$PROJECT_ID/$SERVICE_NAME:latest"
 
-echo "🏗️ Building frontend..."
-cd frontend && npm run build
-cd ..
+echo "🏗️  Building frontend..."
+(cd frontend && rm -rf dist && npm run build)
 
-echo "🚀 Deploying $SERVICE_NAME to $REGION (Project: $PROJECT_ID)..."
+echo "🐳 Building Docker image (explicit Dockerfile, not buildpacks)..."
+gcloud builds submit \
+    --tag "$IMAGE" \
+    --project "$PROJECT_ID" \
+    --timeout 1200s
 
-# Deploy to Cloud Run using source (builds with Dockerfile in current dir)
-gcloud run deploy $SERVICE_NAME \
-    --source . \
-    --region $REGION \
-    --project $PROJECT_ID \
+echo "🚀 Deploying $SERVICE_NAME to $REGION..."
+gcloud run deploy "$SERVICE_NAME" \
+    --image "$IMAGE" \
+    --region "$REGION" \
+    --project "$PROJECT_ID" \
     --allow-unauthenticated \
     --memory 2Gi \
     --cpu 1 \
