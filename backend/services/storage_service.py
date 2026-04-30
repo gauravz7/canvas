@@ -138,6 +138,51 @@ class StorageService:
             logger.error(f"Error downloading GCS blob {gcs_uri}: {e}")
             return None
 
+    def register_asset(
+        self,
+        user_id: str,
+        storage_path: str,
+        asset_type: str,
+        mime_type: str,
+        prompt: str = "",
+        model_id: str = "",
+        meta_data: dict = None
+    ) -> Asset:
+        """Register an existing file as an Asset in the DB without re-saving content."""
+        db = SessionLocal()
+        try:
+            user_id = self._sanitize_path_component(user_id)
+            # Skip if already registered for this user + path
+            existing = db.query(Asset).filter(
+                Asset.user_id == user_id,
+                Asset.storage_path == storage_path
+            ).first()
+            if existing:
+                return existing
+
+            filename = os.path.basename(storage_path)
+            asset = Asset(
+                user_id=user_id,
+                asset_type=asset_type,
+                storage_path=storage_path,
+                filename=filename,
+                mime_type=mime_type,
+                prompt=prompt,
+                model_id=model_id,
+                meta_data=meta_data or {}
+            )
+            db.add(asset)
+            db.commit()
+            db.refresh(asset)
+            logger.info(f"Registered asset {asset.id}: {storage_path} ({asset_type}) for user={user_id}")
+            return asset
+        except Exception as e:
+            logger.error(f"register_asset failed: {e}")
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
     def upload_to_gcs(self, data: bytes, bucket_name: str, mime_type: str = "video/mp4") -> str:
         import uuid as _uuid
         blob_path = f"uploads/{_uuid.uuid4()}.mp4"

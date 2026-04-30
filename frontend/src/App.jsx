@@ -186,7 +186,7 @@ function AppContent() {
     { id: 'canvas', label: 'Canvas', icon: <LayoutGrid size={20} /> },
     { id: 'templates', label: 'Saved Canvas', icon: <Library size={20} /> },
     { id: 'studio', label: 'Studio', icon: <AppWindow size={20} /> },
-    { id: 'history', label: 'History', icon: <History size={20} /> },
+    { id: 'history', label: 'Assets', icon: <History size={20} /> },
   ];
 
   if (loading) {

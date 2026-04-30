@@ -934,30 +934,35 @@ class WorkflowEngine:
                         video["storage_path"] = asset.storage_path if asset else None
                     
                     if "uri" in video:
-                        # 1. Download locally for reliable proxying
                         local_rel_path = await asyncio.to_thread(
                             storage_service.download_gcs_blob,
                             gcs_uri=video["uri"],
                             user_id=user_id
                         )
-                        
+
                         if local_rel_path:
-                            # Set the proxy URL for the frontend
-                            # The frontend expects /api/media/... but storage_service returns user_id/...
-                            # Wait, storage_service and engine.py have different expectations of relative path.
-                            # In storage_service.save_asset, relative_path is user_id/asset_type/filename.
-                            # The FastAPI server mounts /data to the 'data' directory.
-                            # So the full path is /api/media/{user_id}/{type}/{filename}
                             video["url"] = f"/api/media/{local_rel_path}"
+                            video["storage_path"] = local_rel_path
                             logger.info(f"Local proxy URL for video: {video['url']}")
+
+                            # Register in Asset DB so the video appears in user's Assets
+                            try:
+                                await asyncio.to_thread(
+                                    storage_service.register_asset,
+                                    user_id=user_id,
+                                    storage_path=local_rel_path,
+                                    asset_type="video",
+                                    mime_type=video.get("mime_type", "video/mp4"),
+                                    prompt=prompt[:200],
+                                    model_id=node.data.model or "veo-3.1",
+                                    meta_data={"gcs_uri": video["uri"]}
+                                )
+                            except Exception as e:
+                                logger.warning(f"Failed to register video as asset: {e}")
                         else:
-                            # Fallback to signed URL if download fails
                             signed_url = vertex_service.get_signed_url(video["uri"])
                             if signed_url:
                                 video["url"] = signed_url
-                        
-                        # Also save it as a reference asset if not already saved
-                        if "storage_path" not in video:
                             video["storage_path"] = video["uri"]
             
             return response
@@ -994,6 +999,22 @@ class WorkflowEngine:
                     )
                     if local_rel_path:
                         video["url"] = f"/api/media/{local_rel_path}"
+                        video["storage_path"] = local_rel_path
+
+                        # Register in Asset DB
+                        try:
+                            await asyncio.to_thread(
+                                storage_service.register_asset,
+                                user_id=user_id,
+                                storage_path=local_rel_path,
+                                asset_type="video",
+                                mime_type="video/mp4",
+                                prompt=f"Upscaled: {gcs_uri}"[:200],
+                                model_id="veo-3.1-upscale",
+                                meta_data={"gcs_uri": video["uri"], "source_uri": gcs_uri}
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to register upscaled video as asset: {e}")
 
             return response
 
