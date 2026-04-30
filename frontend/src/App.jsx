@@ -31,6 +31,18 @@ function AppContent() {
   const [activeWorkflowIdx, setActiveWorkflowIdx] = useState(0);
   const [renamingTabIdx, setRenamingTabIdx] = useState(null);
   const [renameValue, setRenameValue] = useState('');
+  const [pendingTabSwitch, setPendingTabSwitch] = useState(null);
+
+  // When a new tab is queued for switch, activate it after the workflowTabs state updates
+  React.useEffect(() => {
+    if (pendingTabSwitch !== null) {
+      const idx = workflowTabs.findIndex(t => t.id === pendingTabSwitch);
+      if (idx >= 0) {
+        setActiveWorkflowIdx(idx);
+        setPendingTabSwitch(null);
+      }
+    }
+  }, [workflowTabs, pendingTabSwitch]);
 
   // Team state
   const [userTeams, setUserTeams] = useState([]);
@@ -45,19 +57,17 @@ function AppContent() {
   };
 
   const openWorkflowInNewTab = (workflowData) => {
+    const newTabId = (workflowData.id || uuidv4()) + '-' + Date.now();
     const newTab = {
-      id: workflowData.id || uuidv4(),
+      id: newTabId,
       name: workflowData.name || 'Loaded Workflow',
       nodes: workflowData.nodes || [],
       edges: workflowData.edges || []
     };
+    console.log('[openWorkflowInNewTab]', newTab.name, 'nodes:', newTab.nodes.length, 'edges:', newTab.edges.length);
     setActiveTab('canvas');
-    setWorkflowTabs(prev => {
-      const newTabs = [...prev, newTab];
-      // Schedule activeIdx update after the array update
-      setTimeout(() => setActiveWorkflowIdx(newTabs.length - 1), 0);
-      return newTabs;
-    });
+    setWorkflowTabs(prev => [...prev, newTab]);
+    setPendingTabSwitch(newTabId);
   };
 
   const closeTab = (idx) => {
