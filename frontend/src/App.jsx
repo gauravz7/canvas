@@ -58,17 +58,26 @@ function AppContent() {
   };
 
   const openWorkflowInNewTab = (workflowData) => {
-    const newTabId = (workflowData.id || uuidv4()) + '-' + Date.now();
+    const workflowId = workflowData.id || uuidv4();
+    // If a tab with this workflow is already open, focus it
+    const existingIdx = workflowTabs.findIndex(t => t.workflowId === workflowId);
+    if (existingIdx >= 0) {
+      setActiveTab('canvas');
+      setActiveWorkflowIdx(existingIdx);
+      return;
+    }
+    const tabId = uuidv4();
     const newTab = {
-      id: newTabId,
+      id: tabId,
+      workflowId: workflowId,
       name: workflowData.name || 'Loaded Workflow',
       nodes: workflowData.nodes || [],
       edges: workflowData.edges || []
     };
-    console.log('[openWorkflowInNewTab]', newTab.name, 'nodes:', newTab.nodes.length, 'edges:', newTab.edges.length);
+    console.log('[openWorkflowInNewTab]', newTab.name, 'workflowId:', workflowId, 'nodes:', newTab.nodes.length);
     setActiveTab('canvas');
     setWorkflowTabs(prev => [...prev, newTab]);
-    setPendingTabSwitch(newTabId);
+    setPendingTabSwitch(tabId);
   };
 
   const closeTab = (idx) => {

@@ -368,7 +368,7 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas, onOpenInNewTab }) => {
                     onClick={() => {
                       if (onOpenInNewTab) {
                         onOpenInNewTab({
-                          id: wf.id + '-' + Date.now(),
+                          id: wf.id,
                           name: wf.name,
                           nodes: wf.nodes || [],
                           edges: wf.edges || []
@@ -419,7 +419,7 @@ const SavedCanvasPanel = ({ userId, onSwitchToCanvas, onOpenInNewTab }) => {
                             const data = await res.json();
                             if (onOpenInNewTab) {
                               onOpenInNewTab({
-                                id: wf.id + '-' + Date.now(),
+                                id: wf.id,
                                 name: wf.name || data.name || 'Loaded Workflow',
                                 nodes: data.nodes || [],
                                 edges: data.edges || []

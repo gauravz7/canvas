@@ -63,7 +63,7 @@ const CanvasPage = ({ userId = 'default_user', initialData, onStateChange }) => 
   const [useCache, setUseCache] = useState(false);
   const [currentExecutionId, setCurrentExecutionId] = useState(null);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
-  const [workflowId, setWorkflowId] = useState(initialData?.id || uuidv4());
+  const [workflowId, setWorkflowId] = useState(initialData?.workflowId || initialData?.id || uuidv4());
   const [workflowName, setWorkflowName] = useState(initialData?.name || 'Untitled Workflow');
   const [visibility, setVisibility] = useState('private');
   const [selectedTeamId, setSelectedTeamId] = useState('');
@@ -82,7 +82,8 @@ const CanvasPage = ({ userId = 'default_user', initialData, onStateChange }) => 
   // Report state changes back to parent for tab preservation
   React.useEffect(() => {
     if (onStateChange) {
-      onStateChange({ id: workflowId, name: workflowName, nodes, edges });
+      // Preserve tab id (don't overwrite with workflowId), just update workflow data
+      onStateChange({ workflowId: workflowId, name: workflowName, nodes, edges });
     }
   }, [nodes, edges, workflowName, workflowId]);
 
