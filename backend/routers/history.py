@@ -39,6 +39,7 @@ def _enrich_assets(assets):
     return results
 
 
+@router.get("", response_model=List[AssetResponse])
 @router.get("/", response_model=List[AssetResponse])
 async def get_history(
     asset_type: Optional[str] = Query(None, description="Filter by asset type: image, video, audio"),
@@ -53,5 +54,36 @@ async def get_history(
     query = db.query(Asset).filter(Asset.user_id.in_(user_ids))
     if asset_type:
         query = query.filter(Asset.asset_type == asset_type)
-    assets = query.order_by(Asset.created_at.desc()).offset(offset).limit(min(limit, 200)).all()
-    return _enrich_assets(assets)
+    db_assets = query.order_by(Asset.created_at.desc()).offset(offset).limit(min(limit, 200)).all()
+    enriched = _enrich_assets(db_assets)
+
+    # Merge with GCS-backed assets (for Cloud Run durability across instance restarts)
+    try:
+        from services.storage_service import storage_service
+        existing_paths = {a.get("storage_path") for a in enriched}
+        for uid in user_ids:
+            for gcs_asset in storage_service.list_assets_from_gcs(uid):
+                if gcs_asset.get("storage_path") in existing_paths:
+                    continue
+                if asset_type and gcs_asset.get("asset_type") != asset_type:
+                    continue
+                # Map to AssetResponse-shaped dict
+                enriched.append({
+                    "id": gcs_asset.get("id", 0),
+                    "user_id": gcs_asset.get("user_id", uid),
+                    "asset_type": gcs_asset.get("asset_type", ""),
+                    "storage_path": gcs_asset.get("storage_path", ""),
+                    "filename": gcs_asset.get("filename", ""),
+                    "mime_type": gcs_asset.get("mime_type"),
+                    "prompt": gcs_asset.get("prompt"),
+                    "model_id": gcs_asset.get("model_id"),
+                    "created_at": gcs_asset.get("created_at"),
+                    "meta_data": gcs_asset.get("meta_data") or {},
+                    "signed_url": None,
+                })
+                existing_paths.add(gcs_asset.get("storage_path"))
+    except Exception:
+        pass
+
+    enriched.sort(key=lambda a: str(a.get("created_at") or ""), reverse=True)
+    return enriched[:limit]

@@ -85,7 +85,23 @@ async def serve_media(user_id: str, asset_type: str, filename: str):
         return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
     if not os.path.isfile(file_path):
-        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+        # Try to fetch from GCS (Cloud Run instances have ephemeral disk)
+        try:
+            from google.cloud import storage as gcs_storage
+            from config import model_config as _mc
+            bucket_name = os.getenv("ASSETS_BUCKET", _mc.VEO_BUCKET)
+            blob_path = f"user_assets/{safe_user}/{safe_type}/{safe_file}"
+            client = gcs_storage.Client()
+            bucket = client.bucket(bucket_name)
+            blob = bucket.blob(blob_path)
+            if blob.exists():
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                blob.download_to_filename(file_path)
+            else:
+                return JSONResponse(status_code=404, content={"detail": "Not Found"})
+        except Exception as e:
+            logger.warning(f"GCS media fallback failed: {e}")
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
     mime_type, _ = mimetypes.guess_type(file_path)
     return FileResponse(file_path, media_type=mime_type)

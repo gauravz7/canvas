@@ -93,9 +93,69 @@ class StorageService:
             db.add(asset)
             db.commit()
             db.refresh(asset)
+
+            # Also persist to GCS for cross-instance durability on Cloud Run
+            self._persist_asset_to_gcs(asset, file_path)
+
             return asset
         finally:
             db.close()
+
+    def _persist_asset_to_gcs(self, asset, local_file_path: str):
+        """Upload asset file + metadata JSON to GCS so it survives Cloud Run instance restarts."""
+        try:
+            from config import model_config
+            import json
+            bucket_name = os.getenv("ASSETS_BUCKET", model_config.VEO_BUCKET)
+            client = storage.Client()
+            bucket = client.bucket(bucket_name)
+
+            # Upload the asset file
+            if local_file_path and os.path.exists(local_file_path):
+                blob_path = f"user_assets/{asset.storage_path}"
+                blob = bucket.blob(blob_path)
+                blob.upload_from_filename(local_file_path, content_type=asset.mime_type)
+
+            # Upload metadata sidecar JSON
+            meta = {
+                "user_id": asset.user_id,
+                "asset_type": asset.asset_type,
+                "storage_path": asset.storage_path,
+                "filename": asset.filename,
+                "mime_type": asset.mime_type,
+                "prompt": asset.prompt,
+                "model_id": asset.model_id,
+                "created_at": asset.created_at.isoformat() if asset.created_at else None,
+                "meta_data": asset.meta_data or {},
+            }
+            meta_blob = bucket.blob(f"user_asset_metadata/{asset.user_id}/{asset.id}.json")
+            meta_blob.upload_from_string(json.dumps(meta), content_type="application/json")
+        except Exception as e:
+            logger.warning(f"GCS persistence failed (non-fatal): {e}")
+
+    def list_assets_from_gcs(self, user_id: str) -> List[dict]:
+        """List asset metadata from GCS for a given user. Used to recover after instance restart."""
+        try:
+            from config import model_config
+            import json
+            user_id = self._sanitize_path_component(user_id)
+            bucket_name = os.getenv("ASSETS_BUCKET", model_config.VEO_BUCKET)
+            client = storage.Client()
+            bucket = client.bucket(bucket_name)
+            prefix = f"user_asset_metadata/{user_id}/"
+            blobs = list(bucket.list_blobs(prefix=prefix))
+            assets = []
+            for blob in blobs:
+                try:
+                    data = json.loads(blob.download_as_text())
+                    assets.append(data)
+                except Exception:
+                    pass
+            assets.sort(key=lambda a: a.get("created_at", ""), reverse=True)
+            return assets
+        except Exception as e:
+            logger.warning(f"GCS list_assets failed: {e}")
+            return []
 
     def get_history(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Asset]:
         user_id = self._sanitize_path_component(user_id)
@@ -175,6 +235,11 @@ class StorageService:
             db.commit()
             db.refresh(asset)
             logger.info(f"Registered asset {asset.id}: {storage_path} ({asset_type}) for user={user_id}")
+
+            # Persist to GCS for cross-instance durability
+            full_local_path = os.path.join(self.assets_dir, storage_path)
+            self._persist_asset_to_gcs(asset, full_local_path)
+
             return asset
         except Exception as e:
             logger.error(f"register_asset failed: {e}")
