@@ -337,17 +337,7 @@ class VeoService:
 
         log_service.info(f"Upscale operation started: {op_name}", "VeoService")
 
-        # Extract operation ID and build the correct polling URL
-        # op_name format: projects/.../locations/.../publishers/.../models/.../operations/{op_id}
-        # Poll URL should be: projects/.../locations/.../operations/{op_id}
-        if "/publishers/" in op_name:
-            parts = op_name.split("/")
-            op_id = parts[-1]
-            poll_path = f"projects/{self.project_id}/locations/{self.location}/operations/{op_id}"
-        else:
-            poll_path = op_name
-
-        poll_endpoint = f"https://{self.location}-aiplatform.googleapis.com/v1/{poll_path}"
+        poll_endpoint = f"https://{self.location}-aiplatform.googleapis.com/v1/{op_name}"
         log_service.info(f"Upscale poll endpoint: {poll_endpoint}", "VeoService")
 
         poll_data = {}
