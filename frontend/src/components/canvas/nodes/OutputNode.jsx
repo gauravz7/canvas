@@ -255,7 +255,7 @@ const OutputNode = ({ data, isConnectable, selected }) => {
 
           {/* Text Section */}
           {textContent && (
-            <div className="node-value-box whitespace-pre-wrap font-mono text-[10px]">
+            <div className="node-value-box">
               {textContent}
             </div>
           )}
@@ -278,8 +278,8 @@ const OutputNode = ({ data, isConnectable, selected }) => {
   return (
     <div className={`node-card ${data.status === 'running' ? 'running' : ''}`}>
       <NodeResizer
-        minWidth={280}
-        minHeight={250}
+        minWidth={320}
+        minHeight={300}
         isVisible={selected}
         lineClassName="border-orange-500"
         handleClassName="bg-orange-500 border-2 border-white rounded-full w-3 h-3"

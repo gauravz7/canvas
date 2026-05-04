@@ -56,8 +56,8 @@ const InputNode = ({ data, isConnectable, selected }) => {
   return (
     <div className={`node-card ${data.status === 'running' ? 'running' : ''}`}>
       <NodeResizer
-        minWidth={250}
-        minHeight={200}
+        minWidth={300}
+        minHeight={260}
         isVisible={selected}
         lineClassName="border-green-500"
         handleClassName="bg-green-500 border-2 border-white rounded-full w-3 h-3"
@@ -101,7 +101,6 @@ const InputNode = ({ data, isConnectable, selected }) => {
             value={value}
             onChange={handleChange}
             placeholder="Enter prompt..."
-            rows={3}
           />
         ) : (
           <div className="flex flex-col gap-2">
