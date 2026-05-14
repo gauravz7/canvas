@@ -35,3 +35,6 @@ storage/
 .idea/
 .vscode/
 .gemini/
+
+# Internal demo hosting doc - not for public repo
+docs/DEMO_HOSTING_REQUEST.md
